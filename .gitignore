@@ -1,5 +1,6 @@
 # token file
 .token
+.vscode
 
 # Prerequisites
 *.d
