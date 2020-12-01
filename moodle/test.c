@@ -32,6 +32,13 @@ int main() {
     if (mt_init_client(client) == ERR_NONE) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
     }
+    Courses courses = mt_get_courses(client);
+    printf("%d\n", courses.len);
+    for (int i = 0; i < courses.len; ++i) {
+        printf("%s\n", courses.data[i].name);
+    }
+    mt_free_courses(courses);
+
     mt_destroy_client(client);
     fclose(f);
     curl_global_cleanup();
