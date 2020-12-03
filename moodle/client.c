@@ -9,14 +9,12 @@
 #include "json.h"
 #include "util.h"
 #define SERVICE_URL "/webservice/rest/server.php"
+#define UPLOAD_URL "/webservice/upload.php"
 #define PARAM_JSON "moodlewsrestformat=json"
 #define URL_LENGTH 4096
 
-int err;
-
-#define error err
-
-int mt_load_courses_topics(Client *client, Courses courses);
+void mt_load_courses_topics(Client *client, Courses courses, ErrorCode *error);
+json_value *mt_parse_moodle_json(char *data, ErrorCode *error);
 
 Client *mt_new_client(char *token, char *website) {
     Client *client = (Client *)malloc(sizeof(Client));
@@ -26,27 +24,27 @@ Client *mt_new_client(char *token, char *website) {
     return client;
 }
 
-json_value *__mt_client_json_request(Client *client, char *wsfunction, const char *format, ...) {
+json_value *__mt_client_json_request(Client *client, ErrorCode *error, char *wsfunction, const char *format, ...) {
     char url[URL_LENGTH] = "";
-    snprintf(url, URL_LENGTH, "%s%s?wstoken=%s&%s&wsfunction=%s", client->website, SERVICE_URL,
-             client->token, PARAM_JSON, wsfunction);
+    snprintf(url, URL_LENGTH, "%s%s?wstoken=%s&%s&wsfunction=%s", client->website, SERVICE_URL, client->token,
+             PARAM_JSON, wsfunction);
     va_list args;
     va_start(args, format);
     size_t len = strlen(url);
     vsnprintf(url + len, URL_LENGTH - len, format, args);
     va_end(args);
 
-    char *data = httpRequest(url);
+    char *data = httpRequest(url, error);
     if (!data)
         return NULL;
-    json_value *json = json_parse(data, strlen(data));
+    json_value *json = mt_parse_moodle_json(data, error);
     free(data);
     return json;
 }
 
 void mt_client_write_url(Client *client, char *url, char *wsfunction, const char *format, ...) {
-    snprintf(url, URL_LENGTH, "%s%s?wstoken=%s&%s&wsfunction=%s", client->website, SERVICE_URL,
-             client->token, PARAM_JSON, wsfunction);
+    snprintf(url, URL_LENGTH, "%s%s?wstoken=%s&%s&wsfunction=%s", client->website, SERVICE_URL, client->token,
+             PARAM_JSON, wsfunction);
     va_list args;
     va_start(args, format);
     size_t len = strlen(url);
@@ -54,82 +52,62 @@ void mt_client_write_url(Client *client, char *url, char *wsfunction, const char
     va_end(args);
 }
 
-int mt_init_client(Client *client) {
-    int err = ERR_NONE;
+ErrorCode mt_init_client(Client *client) {
+    ErrorCode err = ERR_NONE;
+    json_value *json = __mt_client_json_request(client, &err, "core_webservice_get_site_info", "");
 
-    json_value *json = __mt_client_json_request(client, "core_webservice_get_site_info", "");
-    if (json) {
-        // TODO object check
-        if (!get_by_key(json, "exception")) {
-            json_value *value = get_by_key(json, "fullname");
-            if (value && value->type == json_string) {
-                client->fullName = cloneStr(value->u.string.ptr);
-            } else {
-                client->fullName = cloneStr("");
-            }
-            value = get_by_key(json, "sitename");
-            if (value && value->type == json_string) {
-                client->siteName = cloneStr(value->u.string.ptr);
-            } else {
-                client->siteName = cloneStr("");
-            }
-            value = get_by_key(json, "userid");
-            if (value && value->type == json_integer) {
-                client->userid = value->u.integer;
-            }
-        } else {
-            err = ERR_MOODLE;
-        }
-        json_value_free(json);
+    if (!err) {
+        err = assingJsonValues(json, "ssd", "fullname", &client->fullName, "sitename", &client->siteName, "userid",
+                               &client->userid);
     }
+    json_value_free(json);
     return err;
 }
 
-Courses mt_get_courses(Client *client) {
-    Courses result = {0, NULL};
+Courses mt_get_courses(Client *client, ErrorCode *error) {
+    ErrorCode err = ERR_NONE;
     json_value *courses =
-        __mt_client_json_request(client, "core_enrol_get_users_courses", "&userid=%d", client->userid);
-    if (!courses) {
-        error = ERR_MOODLE;
+        __mt_client_json_request(client, &err, "core_enrol_get_users_courses", "&userid=%d", client->userid);
+
+    Courses result = {0, NULL};
+    if (err) {
+        *error = err;
         return result;
     }
     if (courses->type == json_array) {
         result.data = (Course *)malloc(courses->u.array.length * sizeof(Course));
         if (result.data) {
             result.len = courses->u.array.length;
+
+            for (int i = 0; i < result.len; ++i)
+                result.data[i].topics.len = 0;
+
             int skip = 0;
             for (int i = 0; i < result.len; ++i) {
-                json_value *value = get_by_key(courses->u.array.values[i], "format");
-                if (!value || value->type != json_string ||
-                    strcmp(value->u.string.ptr, "topics") != 0) {
+                json_value *course = courses->u.array.values[i];
+                json_value *value = get_by_key(course, "format");
+                result.data[i].topics.len = 0;
+                if (!value || value->type != json_string || strcmp(value->u.string.ptr, "topics") != 0) {
                     // only topics format courses are supported
                     ++skip;
                     continue;
                 }
-
-                value = get_by_key(courses->u.array.values[i], "id");
-                if (value && value->type == json_integer) {
-                    result.data[i - skip].id = value->u.integer;
-                } else {
-                    error = ERR_MOODLE;
-                    break;
-                }
-
-                value = get_by_key(courses->u.array.values[i], "fullname");
-                if (value && value->type == json_string) {
-                    result.data[i - skip].name = cloneStr(value->u.string.ptr);
-                    if (!result.data[i - skip].name)
-                        error = ERR_ALLOC;
-                } else {
-                    error = ERR_MOODLE;
+                err = assingJsonValues(course, "ds", "id", &result.data[i - skip].id, "fullname",
+                                       &result.data[i - skip].name);
+                if (err) {
+                    *error = err;
                     break;
                 }
             }
             result.len -= skip;
+        } else {
+            *error = ERR_ALLOC;
         }
+    } else {
+        *error = ERR_INVALID_JSON_VALUE;
     }
+    mt_load_courses_topics(client, result, error);
     json_value_free(courses);
-    mt_load_courses_topics(client, result);
     return result;
 }
 
@@ -181,7 +159,7 @@ Modules mt_create_modules(json_value *json) {
         modules.len = json->u.array.length;
         int skip = 0;
         // TODO
-        modules.data = (Module *) malloc(modules.len * sizeof(Topic));
+        modules.data = (Module *)malloc(modules.len * sizeof(Topic));
         for (int i = 0; i < json->u.array.length; ++i) {
             json_value *module = json->u.array.values[i];
             json_value *type = get_by_key(module, "modname");
@@ -213,62 +191,60 @@ Modules mt_create_modules(json_value *json) {
 }
 
 // not NULL expected
-Topics mt_create_topics(json_value *json) {
+Topics mt_create_topics(json_value *json, ErrorCode *error) {
     Topics topics = {0, NULL};
     if (json->type == json_array) {
-        topics.len = json->u.array.length;
-        // TODO
-        topics.data = (Topic *) malloc(topics.len * sizeof(Topic));
-        for (int i = 0; i < json->u.array.length; ++i) {
-            json_value *topic = json->u.array.values[i];
-
-            json_value *summary = get_by_key(topic, "summary");
-            if (summary && summary->type == json_string)
-                topics.data[i].summaryHtml = cloneStr(summary->u.string.ptr);
-
-            json_value *name = get_by_key(topic, "name");
-            if (name && name->type == json_string)
-                topics.data[i].name = cloneStr(name->u.string.ptr);
-
-            json_value *id = get_by_key(topic, "id");
-            if (id && id->type == json_integer)
-                topics.data[i].id = id->u.integer;
-
-            json_value *modules = get_by_key(topic, "modules");
-            if (modules) {
+        topics.data = (Topic *)malloc(json->u.array.length * sizeof(Topic));
+        if (!topics.data) {
+            *error = ERR_ALLOC;
+        } else {
+            for (int i = 0; i < json->u.array.length; ++i) {
+                Topic *topic = &topics.data[i];
+                topic->modules.len = 0;
+                json_value *modules;
+                ErrorCode err = assingJsonValues(json->u.array.values[i], "ssda", "summary", &topic->summaryHtml,
+                                                 "name", &topic->name, "id", &topic->id, "modules", &modules);
+                ++topics.len;
+                if (err) {
+                    *error = err;
+                    break;
+                }
                 topics.data[i].modules = mt_create_modules(modules);
             }
         }
     } else {
-        // TODO
+        *error = ERR_INVALID_JSON_VALUE;
     }
     return topics;
 }
 
-int mt_load_courses_topics(Client *client, Courses courses) {
+void mt_load_courses_topics(Client *client, Courses courses, ErrorCode *error) {
     char urls[courses.len][URL_LENGTH + 1];
     for (int i = 0; i < courses.len; ++i) {
-        mt_client_write_url(client, urls[i], "core_course_get_contents", "&courseid=%d",
-                            courses.data[i]);
+        mt_client_write_url(client, urls[i], "core_course_get_contents", "&courseid=%d", courses.data[i].id);
     }
     char *urlArray[URL_LENGTH + 1];
     for (int i = 0; i < courses.len; ++i)
         urlArray[i] = urls[i];
-    char **results = httpMultiRequest(urlArray, courses.len);
-    // return 0;
+    char **results = httpMultiRequest(urlArray, courses.len, error);
+
     if (results) {
         for (int i = 0; i < courses.len; ++i) {
             if (results[i]) {
-                json_value *topics = json_parse(results[i], strlen(results[i]));
-                if (topics) {
-                    courses.data[i].topics = mt_create_topics(topics);
+                ErrorCode err = ERR_NONE;
+                json_value *topics = mt_parse_moodle_json(results[i], &err);
+                if (!err) {
+                    courses.data[i].topics = mt_create_topics(topics, &err);
+                    if (err)
+                        *error = err;
+                    json_value_free(topics);
                 } else {
-                    // TODO
+                    *error = err;
                 }
-                json_value_free(topics);
             }
-            free(results[i]);
         }
+        for (int i = 0; i < courses.len; ++i)
+            free(results[i]);
     }
     free(results);
 }
@@ -279,4 +255,42 @@ void mt_destroy_client(Client *client) {
     free(client->fullName);
     free(client->siteName);
     free(client);
+}
+
+// Parses json and looks for moodle exeption. on success json value needs to be
+// freed.
+json_value *mt_parse_moodle_json(char *data, ErrorCode *error) {
+    json_value *json = json_parse(data, strlen(data));
+    if (json) {
+        if (get_by_key(json, "exception")) {
+            json_value *msg = get_by_key(json, "message");
+            if (msg && msg->type == json_string)
+                setErrorMessage(msg->u.string.ptr);
+            json_value_free(json);
+            json = NULL;
+            *error = ERR_MOODLE_EXCEPTION;
+        }
+    } else {
+        *error = ERR_INVALID_JSON;
+    }
+    return json;
+}
+
+
+long mt_client_upload_file(Client *client, const char *filename, long itemId, ErrorCode *error) {
+    *error = ERR_NONE;
+    char url[URL_LENGTH];
+    long resultId = 0;
+    sprintf(url, "%s%s" "?token=%s" "&itemid=%d", client->website, UPLOAD_URL, client->token, itemId);
+    char *data = httpPostFile(url, filename, "file_box", error);
+    if (!*error) {
+        json_value *json = mt_parse_moodle_json(data, error);
+        if (!*error) {
+            if (json->type == json_array && json->u.array.length > 0)
+                *error = assingJsonValues(json->u.array.values[0], "l", "itemid", &resultId);
+            else
+                *error = ERR_INVALID_JSON_VALUE;
+        }
+    }
+    return resultId;
 }

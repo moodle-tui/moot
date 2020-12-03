@@ -1,13 +1,6 @@
 #ifndef __CLIENT_H
 #define __CLIENT_H
-
-enum {
-    ERR_NONE,
-    ERR_ALLOC,
-    ERR_JSON,
-    ERR_MOODLE,
-    ERR_RESULT,
-} ErrorCode;
+#include "error.h"
 
 typedef struct Client {
     char *fullName, *siteName;
@@ -57,9 +50,12 @@ typedef struct Courses {
 } Courses;
 
 Client *mt_new_client(char *token, char *website);
-int mt_init_client(Client *client);
+ErrorCode mt_init_client(Client *client);
 void mt_destroy_client(Client *client);
-Courses mt_get_courses(Client *client);
+Courses mt_get_courses(Client *client, ErrorCode *error);
 void mt_free_courses(Courses courses);
+
+#define ITEM_ID_NONE 0
+long mt_client_upload_file(Client *client, const char *filename, long itemId, ErrorCode *error);
 
 #endif
