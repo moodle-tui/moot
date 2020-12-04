@@ -1,6 +1,5 @@
 #include <curl/curl.h>
 #include <stdio.h>
-#include <threads.h>
 
 #include "client.h"
 
@@ -24,28 +23,38 @@ int fread_line(FILE *file, char *s, int n) {
     return cutOff;
 }
 
+void test_upload() {
+    // https://school.moodledemo.net/login/token.php?username=markellis267&password=moodle&service=moodle_mobile_app
+    Client *client = mt_new_client("68e137be669341506f7c738ea22175a8", "https://school.moodledemo.net");
+    ErrorCode err = 0;
+    if (!(err = mt_init_client(client))) {
+        printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
+
+        Module mod = {665, 101, MODULE_ASSIGNMENT, "name"}; 
+        Module wk = {90, 1, MODULE_WORKSHOP, "name"}; 
+        mt_client_mod_workshop_submit(client, wk, (const char *[]){"out.txt"}, 1, "t", &err);
+        printf("%s\n", getError(err));
+    } else {
+        printf("%d %s\n", err, getError(err));
+    }
+    mt_destroy_client(client);
+}
+
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
 
-    ErrorCode err = 0;
+    test_upload();
 
-    // printf("%lld\n",
-    //        httpPostFile("https://emokymai.vu.lt/webservice/upload.php?token=216ddc5f39111d27148473a63f80bab4",
-    //                     "./out.txt", "file_box", &err)
-    //             )
-    //             ;
-    // printf("%d\n", err);
-
-    // return 0;
-
+    curl_global_cleanup();
+    return 0;
+    
+    ErrorCode err = ERR_NONE;
     FILE *f = fopen(".token", "r");
     char token[100];
     fread_line(f, token, 99);
     Client *client = mt_new_client(token, "https://emokymai.vu.lt");
     if (!(err = mt_init_client(client))) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
-
-        printf("%d\n", mt_client_upload_file(client, "out.txt", ITEM_ID_NONE, &err));
         printf("%d\n", err);
         return 0;
     } else {

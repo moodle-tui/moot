@@ -14,12 +14,29 @@ typedef enum {
     MODULE_ASSIGNMENT,
     MODULE_WORKSHOP,
     MODULE_RESOURCE,
-} moduleType;
+} ModuleType;
+
+typedef struct ModAssignment {
+
+} ModAssignment;
+
+typedef struct ModWorkshop {
+    /* data */
+} ModWorkshop;
+
+typedef struct ModResource {
+    /* data */
+} ModResource;
 
 typedef struct Module {
     int id, instance;
-    moduleType type;
+    ModuleType type;
     char *name;
+    union {
+        ModAssignment assignment;
+        ModWorkshop workshop;
+        ModResource resource;
+    } contents;
 } Module;
 
 typedef struct Modules {
@@ -55,7 +72,10 @@ void mt_destroy_client(Client *client);
 Courses mt_get_courses(Client *client, ErrorCode *error);
 void mt_free_courses(Courses courses);
 
-#define ITEM_ID_NONE 0
-long mt_client_upload_file(Client *client, const char *filename, long itemId, ErrorCode *error);
+void mt_client_mod_assign_submit(Client *client, Module assignment, const char *filenames[], int len,
+                                 ErrorCode *error);
+// title may not be empty
+void mt_client_mod_workshop_submit(Client *client, Module workshop, const char *filenames[], int len, const char *title,
+                                   ErrorCode *error);
 
 #endif

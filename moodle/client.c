@@ -1,4 +1,3 @@
-#include "client.h"
 #include <curl/curl.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -6,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "client.h"
 #include "json.h"
 #include "util.h"
 #define SERVICE_URL "/webservice/rest/server.php"
@@ -13,8 +13,28 @@
 #define PARAM_JSON "moodlewsrestformat=json"
 #define URL_LENGTH 4096
 
+
 void mt_load_courses_topics(Client *client, Courses courses, ErrorCode *error);
 json_value *mt_parse_moodle_json(char *data, ErrorCode *error);
+Client *mt_new_client(char *token, char *website);
+json_value *__mt_client_json_request(Client *client, ErrorCode *error, char *wsfunction, const char *format, ...);
+void mt_client_write_url(Client *client, char *url, char *wsfunction, const char *format, ...);
+ErrorCode mt_init_client(Client *client);
+Courses mt_get_courses(Client *client, ErrorCode *error);
+void mt_free_modules(Modules modules);
+void mt_free_topics(Topics topics);
+void mt_free_courses(Courses courses);
+void mt_reset_courses_topics(Courses courses);
+ModuleType mt_get_mod_type(const char *module);
+Modules mt_create_modules(json_value *json);
+Topics mt_create_topics(json_value *json, ErrorCode *error);
+void mt_load_courses_topics(Client *client, Courses courses, ErrorCode *error);
+void mt_destroy_client(Client *client);
+json_value *mt_parse_moodle_json(char *data, ErrorCode *error);
+#define ITEM_ID_NONE 0
+long mt_client_upload_file(Client *client, const char *filename, long itemId, ErrorCode *error);
+long mt_client_upload_files(Client *client, const char *filenames[], int len, ErrorCode *error);
+const char *mt_find_moodle_warnings(json_value *json);
 
 Client *mt_new_client(char *token, char *website) {
     Client *client = (Client *)malloc(sizeof(Client));
@@ -142,7 +162,7 @@ void mt_reset_courses_topics(Courses courses) {
     }
 }
 
-moduleType mt_get_mod_type(const char *module) {
+ModuleType mt_get_mod_type(const char *module) {
     if (!strcmp(module, "assign"))
         return MODULE_ASSIGNMENT;
     if (!strcmp(module, "resource"))
@@ -163,7 +183,7 @@ Modules mt_create_modules(json_value *json) {
         for (int i = 0; i < json->u.array.length; ++i) {
             json_value *module = json->u.array.values[i];
             json_value *type = get_by_key(module, "modname");
-            moduleType modtype;
+            ModuleType modtype;
             if (!type || type->type != json_string ||
                 (modtype = mt_get_mod_type(type->u.string.ptr)) == MOD_UNSUPPORTED) {
                 ++skip;
@@ -276,12 +296,15 @@ json_value *mt_parse_moodle_json(char *data, ErrorCode *error) {
     return json;
 }
 
-
 long mt_client_upload_file(Client *client, const char *filename, long itemId, ErrorCode *error) {
     *error = ERR_NONE;
     char url[URL_LENGTH];
     long resultId = 0;
-    sprintf(url, "%s%s" "?token=%s" "&itemid=%d", client->website, UPLOAD_URL, client->token, itemId);
+    sprintf(url,
+            "%s%s"
+            "?token=%s"
+            "&itemid=%d",
+            client->website, UPLOAD_URL, client->token, itemId);
     char *data = httpPostFile(url, filename, "file_box", error);
     if (!*error) {
         json_value *json = mt_parse_moodle_json(data, error);
@@ -291,6 +314,86 @@ long mt_client_upload_file(Client *client, const char *filename, long itemId, Er
             else
                 *error = ERR_INVALID_JSON_VALUE;
         }
+        json_value_free(json);
     }
+    free(data);
     return resultId;
+}
+
+long mt_client_upload_files(Client *client, const char *filenames[], int len, ErrorCode *error) {
+    *error = ERR_NONE;
+    long itemId = mt_client_upload_file(client, filenames[0], ITEM_ID_NONE, error);
+    if (!*error) {
+        for (int i = 1; i < len; ++i) {
+            mt_client_upload_file(client, filenames[i], itemId, error);
+            if (*error)
+                break;
+        }
+    }
+    return itemId;
+}
+
+const char *mt_find_moodle_warnings(json_value *json) {
+    json_value *warnings;
+    if (warnings = get_by_key(json, "warnings")) {
+        json = warnings;
+    }
+    if (json->type == json_array && json->u.array.length > 0) {
+        if (get_by_key(json->u.array.values[0], "warningcode")) {
+            json_value *message = get_by_key(json->u.array.values[0], "message");
+            if (message && message->type == json_string)
+                return message->u.string.ptr;
+        }
+    }
+    return NULL;
+}
+
+void mt_client_mod_assign_submit(Client *client, Module assignment, const char *filenames[], int len,
+                                 ErrorCode *error) {
+    *error = assignment.type == MODULE_ASSIGNMENT ? ERR_NONE : ERR_MISUSED_MOODLE_API;
+    if (*error)
+        return;
+    long itemId = mt_client_upload_files(client, filenames, len, error);
+    if (*error)
+        return;
+    // ignore submit text and comments for now.
+    json_value *json = __mt_client_json_request(client, error, "mod_assign_save_submission",
+                                                "&assignmentid=%d"
+                                                "&plugindata[files_filemanager]=%ld"
+                                                "&plugindata[onlinetext_editor][text]="
+                                                "&plugindata[onlinetext_editor][format]=4"
+                                                "&plugindata[onlinetext_editor][itemid]=%ld",
+                                                assignment.instance, itemId, itemId);
+    if (!*error) {
+        const char *message = mt_find_moodle_warnings(json);
+        if (message) {
+            *error = ERR_MOODLE_EXCEPTION;
+            setErrorMessage(message);
+        }
+    }
+    json_value_free(json);
+}
+
+void mt_client_mod_workshop_submit(Client *client, Module workshop, const char *filenames[], int len, const char *title,
+                                   ErrorCode *error) {
+    *error = workshop.type == MODULE_WORKSHOP ? ERR_NONE : ERR_MISUSED_MOODLE_API;
+    if (*error)
+        return;
+    long itemId = mt_client_upload_files(client, filenames, len, error);
+    if (*error)
+        return;
+
+    json_value *json = __mt_client_json_request(client, error, "mod_workshop_add_submission",
+                                                "&workshopid=%d"
+                                                "&title=%s"
+                                                "&attachmentsid=%ld",
+                                                workshop.instance, title, itemId);
+    if (!*error) {
+        const char *message = mt_find_moodle_warnings(json);
+        if (message) {
+            *error = ERR_MOODLE_EXCEPTION;
+            setErrorMessage(message);
+        }
+    }
+    json_value_free(json);
 }

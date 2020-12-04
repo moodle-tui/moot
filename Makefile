@@ -33,4 +33,4 @@ clean:
 	rm -f $(TEST_OBJ)
 	rm -f $(TEST)
 
-.PHONY: all $(LIB) $(MOODLE) clean $(TEST)
+.PHONY: all $(LIB) $(MOODLE) clean test

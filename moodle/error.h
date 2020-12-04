@@ -5,15 +5,14 @@ typedef enum {
     ERR_NONE = 0,
     ERR_ALLOC,
     ERR_JSON,
-    ERR_MOODLE,
     ERR_MOODLE_EXCEPTION,
-    ERR_RESULT,
     ERR_MISSING_JSON_KEY,
     ERR_INVALID_JSON_VALUE,
     ERR_INVALID_JSON,
     ERR_HTTP_REQUEST_FAIL,
     ERR_CURL_FAIL,
-    ERR_CANT_OPEN_FILE,
+    ERR_FILE_OPERATION,
+    ERR_MISUSED_MOODLE_API,
 } ErrorCode;
 
 const char *getError(ErrorCode);

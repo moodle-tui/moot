@@ -48,6 +48,7 @@ char *cloneStr(const char *s) {
     if (str) {
         strcpy(str, s);
     }
+    
     return str;
 }
 
@@ -178,7 +179,8 @@ char *httpPostFile(const char *url, const char *filename, const char *name, Erro
                 fail = 1;
             }
         } else {
-            *error = ERR_CANT_OPEN_FILE;
+            *error = ERR_FILE_OPERATION;
+            setErrorMessage(filename);
             fail = 1;
         }
         curl_easy_cleanup(handle);
