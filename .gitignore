@@ -1,6 +1,7 @@
 # token file
 .token
 .vscode
+moodle/test/test
 
 # Prerequisites
 *.d

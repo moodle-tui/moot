@@ -52,6 +52,13 @@ char *cloneStr(const char *s) {
     return str;
 }
 
+char *cloneStrErr(const char *s, ErrorCode *error) {
+    char *str = cloneStr(s);
+    if (!str)
+        *error = ERR_ALLOC;
+    return str;
+}
+
 CURL *createCurl(const char *url, void *data) {
     CURL *handle = curl_easy_init();
     curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
@@ -199,6 +206,60 @@ char *httpPostFile(const char *url, const char *filename, const char *name, Erro
     return chunk.memory;
 }
 
+json_value *getJsonProperty(json_value *json, const char *key, json_type type, ErrorCode *error) {
+    json_value *value = get_by_key(json, key);
+    if (value) {
+        if (value->type != type) {
+            *error = ERR_INVALID_JSON_VALUE;
+            value = NULL;
+        }
+    } else {
+        *error = ERR_MISSING_JSON_KEY;
+        setErrorMessage(key);
+    }
+    return value;
+}
+
+long jsonGetInteger(json_value *json, const char *key, ErrorCode *error) {
+    json_value *value = getJsonProperty(json, key, json_integer, error);
+    if (value)
+        return value->u.integer;
+    return 0;
+}
+
+int jsonGetBool(json_value *json, const char *key, ErrorCode *error) {
+    json_value *value = getJsonProperty(json, key, json_boolean, error);
+    if (value)
+        return value->u.boolean;
+    return 0;
+} 
+
+char *jsonGetString(json_value *json, const char *key, ErrorCode *error) {
+    ErrorCode prev = *error;
+    json_value *value = getJsonProperty(json, key, json_string, error);
+    if (*error == ERR_INVALID_JSON_VALUE) {
+        value = getJsonProperty(json, key, json_null, error);
+        if (value) {
+            *error = prev;
+            return NULL;
+        }
+    }
+    if (value)
+        return cloneStrErr(value->u.string.ptr, error);
+    return NULL;
+}
+
+const char *jsonGetStringNoAlloc(json_value *json, const char *key, ErrorCode *error) {
+    json_value *value = getJsonProperty(json, key, json_string, error);
+    if (value)
+        return value->u.string.ptr;
+    return NULL;
+}
+
+json_value *jsonGetArray(json_value *json, const char *key, ErrorCode *error) {
+    return getJsonProperty(json, key, json_array, error);
+}
+
 // a - json_array, o - json_object, i/d - int, l - long, s - char*
 ErrorCode assingJsonValues(json_value *json, const char *format, ...) {
     if (json->type != json_object)
@@ -208,8 +269,10 @@ ErrorCode assingJsonValues(json_value *json, const char *format, ...) {
     for (int i = 0; format[i]; ++i) {
         const char *name = va_arg(args, const char *);
         json_value *val = get_by_key(json, name);
-        if (!val)
+        if (!val) {
+            setErrorMessage(name);
             return ERR_MISSING_JSON_KEY;
+        }
 
         switch (format[i]) {
         case 'd':
