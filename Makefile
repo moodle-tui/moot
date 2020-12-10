@@ -2,6 +2,7 @@ MAKE = make
 LDLIBS = -lcurl -lm
 INCLUDE_LIB = -Ilib/
 INCLUDE_MOODLE = -Imoodle/
+CCFLAGS = -Wall
 
 LIB = lib
 LIB_SRC = $(wildcard $(LIB)/*.c)
@@ -25,7 +26,7 @@ $(MOODLE): $(LIB) $(MOODLE_OBJ)
 
 TEST = ui/ui
 test: $(MOODLE_OBJ) $(LIB_OBJ)
-	$(CC) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $(TEST).o
+	$(CC) $(CCFLAGS) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $(TEST).o
 
 clean:
 	rm -f $(LIB_OBJ)
