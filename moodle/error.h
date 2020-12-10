@@ -13,6 +13,7 @@ typedef enum {
     ERR_CURL_FAIL,
     ERR_FILE_OPERATION,
     ERR_MISUSED_MOODLE_API,
+    ERR_MISMACHING_MOODLE_DATA,
 } ErrorCode;
 
 const char *getError(ErrorCode);

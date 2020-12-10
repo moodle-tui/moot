@@ -1,5 +1,6 @@
 #include <curl/curl.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "client.h"
 
@@ -25,13 +26,14 @@ int fread_line(FILE *file, char *s, int n) {
 
 void test_upload() {
     // https://school.moodledemo.net/login/token.php?username=markellis267&password=moodle&service=moodle_mobile_app
-    Client *client = mt_new_client("68e137be669341506f7c738ea22175a8", "https://school.moodledemo.net");
+    Client *client = mt_new_client("00aa0cd99c8a55577ee8d2987641d4d4", "https://school.moodledemo.net");
     ErrorCode err = 0;
     if (!(err = mt_init_client(client))) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
 
         Module mod = {665, 101, MODULE_ASSIGNMENT, "name"}; 
         Module wk = {90, 1, MODULE_WORKSHOP, "name"}; 
+        
         mt_client_mod_workshop_submit(client, wk, (const char *[]){"out.txt"}, 1, "t", &err);
         printf("%s\n", getError(err));
     } else {
@@ -41,12 +43,14 @@ void test_upload() {
 }
 
 int main() {
+    time(NULL);
+
     curl_global_init(CURL_GLOBAL_ALL);
 
-    test_upload();
+    // test_upload();
 
-    curl_global_cleanup();
-    return 0;
+    // curl_global_cleanup();
+    // return 0;
     
     ErrorCode err = ERR_NONE;
     FILE *f = fopen(".token", "r");
@@ -56,13 +60,14 @@ int main() {
     if (!(err = mt_init_client(client))) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
         printf("%d\n", err);
-        return 0;
+        // return 0;
     } else {
         printf("%d %s\n", err, getError(err));
         return 0;
     }
     Courses courses = mt_get_courses(client, &err);
-    printf("%d\n", courses.len);
+
+    printf("%d\n", err);
     for (int i = 0; i < courses.len; ++i) {
         printf("%s %d\n", courses.data[i].name, courses.data[i].id);
         for (int j = 0; j < courses.data[i].topics.len; ++j) {
@@ -70,9 +75,14 @@ int main() {
             printf(" - %s\n", courses.data[i].topics.data[j].name);
             for (int k = 0; k < modules.len; ++k) {
                 printf("  - %s\n", modules.data[k].name);
+                if (modules.data[k].type == MODULE_WORKSHOP) {
+                    // printf("[%s]\n", modules.data[k].contents.assignment.description.text);
+                    printf("[%s]\n", modules.data[k].contents.workshop.description.text);
+                }
             }
         }
     }
+    // return 0;
     mt_free_courses(courses);
 
     mt_destroy_client(client);

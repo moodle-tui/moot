@@ -14,7 +14,7 @@ struct errorMsg{
     { ERR_ALLOC, "File not found" },
     { ERR_JSON, "Invalid input" },
     { ERR_MOODLE_EXCEPTION, "Moodle returned exception: %s" },
-    { ERR_MISSING_JSON_KEY, "Missing json key" },
+    { ERR_MISSING_JSON_KEY, "Missing json key: %s" },
     { ERR_INVALID_JSON_VALUE, "Invalid json value" },
     { ERR_INVALID_JSON, "Invalid json stream" },
     { ERR_HTTP_REQUEST_FAIL, "Http request failed: %s" },
