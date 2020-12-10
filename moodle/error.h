@@ -16,7 +16,7 @@ typedef enum {
     MD_ERR_MISMACHING_MOODLE_DATA,
 } MDError;
 
-const char *md_get_error_message(MDError);
+const char *md_error_get_message(MDError);
 // privat
 void md_set_error_message(const char *message);
 

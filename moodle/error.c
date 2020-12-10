@@ -28,7 +28,7 @@ void md_set_error_message(const char *message) {
 }
 
 
-const char *md_get_error_message(MDError code) {
+const char *md_error_get_message(MDError code) {
     errBuff[0] = 0;
     int size = sizeof(errorMessages) / sizeof(struct errorMsg);
     for (int i = 0; i < size; ++i) {

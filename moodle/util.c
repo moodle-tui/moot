@@ -152,10 +152,7 @@ char **httpMultiRequest(char *urls[], unsigned int size, MDError *error) {
     unsigned int transfers = 0;
     int msgsLeft = -1;
     int stillAlive = 1;
-    for(int i = 0; i < size; ++i) {
-        printf("{%s}\n", urls[i]);
-    }
-
+    
     cm = curl_multi_init();
     curl_multi_setopt(cm, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
 

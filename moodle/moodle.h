@@ -128,18 +128,18 @@ typedef struct MDCourse {
     MDArray topics;
 } MDCourse;
 
-MDClient *mt_new_client(char *token, char *website);
+MDClient *md_client_new(char *token, char *website);
 MDError md_client_init(MDClient *client);
-void mt_destroy_client(MDClient *client);
-MDArray mt_get_courses(MDClient *client, MDError *error);
+void md_client_destroy(MDClient *client);
+MDArray md_client_fetch_courses(MDClient *client, MDError *error);
 void md_courses_cleanup(MDArray courses);
 
 
-void mt_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray filenames, MDError *error);
+void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray filenames, MDError *error);
 // title may not be empty
-void mt_client_mod_workshop_submit(MDClient *client, MDModule *workshop, MDArray filenames, const char *title,
+void md_client_mod_workshop_submit(MDClient *client, MDModule *workshop, MDArray filenames, const char *title,
                                    MDError *error);
-void mt_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDError *error);
+void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDError *error);
 
 
 #endif

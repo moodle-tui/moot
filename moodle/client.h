@@ -8,10 +8,10 @@
 #include "moodle.h"
 #include "json.h"
 
-MDClient* mt_new_client(char* token, char* website);
+MDClient* md_client_new(char* token, char* website);
 void mt_client_write_url(MDClient* client, char* url, char* wsfunction, const char* format, ...);
 MDError md_client_init(MDClient* client);
-MDArray mt_get_courses(MDClient* client, MDError* error);
+MDArray md_client_fetch_courses(MDClient* client, MDError* error);
 void md_array_init(MDArray* array);
 void md_course_init(MDCourse* course);
 void md_course_cleanup(MDCourse* course);
@@ -23,12 +23,12 @@ MDModType mt_get_mod_type(const char* module);
 MDArray mt_create_modules(json_value* json, MDError* error);
 MDArray mt_parse_topics(json_value* json, MDError* error);
 void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error);
-void mt_destroy_client(MDClient* client);
+void md_client_destroy(MDClient* client);
 json_value* mt_parse_moodle_json(char* data, MDError* error);
 long mt_client_upload_file(MDClient* client, const char* filename, long itemId, MDError* error);
 long mt_client_upload_files(MDClient* client, MDArray filenames, MDError* error);
 const char* mt_find_moodle_warnings(json_value* json);
-void mt_client_mod_assign_submit(MDClient* client, MDModule* assignment, MDArray filenames, MDError* error);
+void md_client_mod_assign_submit(MDClient* client, MDModule* assignment, MDArray filenames, MDError* error);
 MDModule* mt_locate_courses_module(MDCourse course, int instance, MDError* error);
 MDArray mt_parse_files(json_value* jsonFiles, MDError* error);
 void mt_free_rich_text(MDRichText text);
@@ -52,6 +52,6 @@ void mt_parse_assignment_plugins(json_value* configs, MDModAssignment* assignmen
 void mt_client_courses_set_mod_assign_data(MDClient* client, MDArray courses, char* data, MDError* error);
 void mt_client_courses_set_mod_workshop_data(MDClient* client, MDArray courses, char* data, MDError* error);
 void mt_client_courses_set_mod_resource_data(MDClient* client, MDArray courses, char* data, MDError* error);
-void mt_client_download_file(MDClient* client, MDFile* file, FILE* stream, MDError* error);
+void md_client_download_file(MDClient* client, MDFile* file, FILE* stream, MDError* error);
 
 #endif

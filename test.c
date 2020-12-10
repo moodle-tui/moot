@@ -28,18 +28,18 @@ int main() {
     FILE *f = fopen("../.token", "r");
     char token[100];
     fread_line(f, token, 99);
-    Client *client = mt_new_client(token, "https://emokymai.vu.lt");
+    Client *client = md_client_new(token, "https://emokymai.vu.lt");
     if (mt_init_client(client) == ERR_NONE) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
     }
-    Courses courses = mt_get_courses(client);
+    Courses courses = md_client_fetch_courses(client);
     printf("%d\n", courses.len);
     for (int i = 0; i < courses.len; ++i) {
         printf("%s\n", courses.data[i].name);
     }
     mt_free_courses(courses);
 
-    mt_destroy_client(client);
+    md_client_destroy(client);
     fclose(f);
     curl_global_cleanup();
 }

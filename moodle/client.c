@@ -15,7 +15,7 @@
 #define NO_IDENTIFIER -1
 #define NO_ITEM_ID 0
 
-MDClient* mt_new_client(char* token, char* website) {
+MDClient* md_client_new(char* token, char* website) {
     MDClient* client = (MDClient*)malloc(sizeof(MDClient));
     client->token = clone_str(token);
     client->website = clone_str(website);
@@ -68,7 +68,7 @@ MDError md_client_init(MDClient* client) {
     return err;
 }
 
-MDArray mt_get_courses(MDClient* client, MDError* error) {
+MDArray md_client_fetch_courses(MDClient* client, MDError* error) {
     *error = MD_ERR_NONE;
     json_value* jsonCourses =
         md_client_do_http_json_request(client, error, "core_enrol_get_users_courses", "&userid=%d", client->userid);
@@ -294,7 +294,7 @@ void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error) {
     free(results);
 }
 
-void mt_destroy_client(MDClient* client) {
+void md_client_destroy(MDClient* client) {
     free(client->token);
     free(client->website);
     free(client->fullName);
@@ -373,7 +373,7 @@ const char* mt_find_moodle_warnings(json_value* json) {
     return NULL;
 }
 
-void mt_client_mod_assign_submit(MDClient* client, MDModule* assignment, MDArray filenames, MDError* error) {
+void md_client_mod_assign_submit(MDClient* client, MDModule* assignment, MDArray filenames, MDError* error) {
     *error = assignment->type == MD_MOD_ASSIGNMENT ? MD_ERR_NONE : MD_ERR_MISUSED_MOODLE_API;
     if (*error)
         return;
@@ -398,7 +398,7 @@ void mt_client_mod_assign_submit(MDClient* client, MDModule* assignment, MDArray
     json_value_free(json);
 }
 
-void mt_client_mod_workshop_submit(MDClient* client,
+void md_client_mod_workshop_submit(MDClient* client,
                                    MDModule* workshop,
                                    MDArray filenames,
                                    const char* title,
@@ -714,7 +714,7 @@ void mt_client_courses_set_mod_resource_data(MDClient* client, MDArray courses, 
     json_value_free(json);
 }
 
-void mt_client_download_file(MDClient* client, MDFile* file, FILE* stream, MDError* error) {
+void md_client_download_file(MDClient* client, MDFile* file, FILE* stream, MDError* error) {
     *error = MD_ERR_NONE;
     char url[URL_LENGTH];
     snprintf(url, URL_LENGTH, "%s?token=%s", file->url, client->token);

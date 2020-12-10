@@ -27,7 +27,7 @@ int fread_line(FILE *file, char *s, int n) {
 
 void test_upload() {
     // https://school.moodledemo.net/login/token.php?username=markellis267&password=moodle&service=moodle_mobile_app
-    MDClient *client = mt_new_client("00aa0cd99c8a55577ee8d2987641d4d4", "https://school.moodledemo.net");
+    MDClient *client = md_client_new("00aa0cd99c8a55577ee8d2987641d4d4", "https://school.moodledemo.net");
     MDError err = 0;
     if (!(err = md_client_init(client))) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
@@ -35,12 +35,12 @@ void test_upload() {
         // Module mod = {665, 101, MODULE_ASSIGNMENT, "name"};
         MDModule wk = {90, 1, MD_MODULE_WORKSHOP, "name"};
 
-        mt_client_mod_workshop_submit(client, &wk, MD_MAKE_ARR(const char *, "README.md"), "t", &err);
-        printf("%s\n", md_get_error_message(err));
+        md_client_mod_workshop_submit(client, &wk, MD_MAKE_ARR(const char *, "README.md"), "t", &err);
+        printf("%s\n", md_error_get_message(err));
     } else {
-        printf("%d %s\n", err, md_get_error_message(err));
+        printf("%d %s\n", err, md_error_get_message(err));
     }
-    mt_destroy_client(client);
+    md_client_destroy(client);
 }
 
 int main() {
@@ -57,16 +57,16 @@ int main() {
     FILE *f = fopen(".token", "r");
     char token[100];
     fread_line(f, token, 99);
-    MDClient *client = mt_new_client(token, "https://emokymai.vu.lt");
+    MDClient *client = md_client_new(token, "https://emokymai.vu.lt");
     if (!(err = md_client_init(client))) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
         printf("%d\n", err);
         // return 0;
     } else {
-        printf("%d %s\n", err, md_get_error_message(err));
+        printf("%d %s\n", err, md_error_get_message(err));
         return 0;
     }
-    MDArray courseArr = mt_get_courses(client, &err);
+    MDArray courseArr = md_client_fetch_courses(client, &err);
     MDCourse *courses = MD_ARR(courseArr, MDCourse);
 
     printf("%d\n", err);
@@ -84,7 +84,7 @@ int main() {
                             FILE *f = fopen(MD_FILES(MD_MODULES(modules)[k].contents.resource.files)[a].filename, "w");
                             if (!f)
                                 perror("noppe");
-                            mt_client_download_file(client, &MD_ARR(MD_ARR(modules, MDModule)[k].contents.resource.files, MDFile)[a], f,
+                            md_client_download_file(client, &MD_ARR(MD_ARR(modules, MDModule)[k].contents.resource.files, MDFile)[a], f,
                                                           &err);
                             fclose(f);
                             return 0;
@@ -98,12 +98,12 @@ int main() {
         }
 
     } else {
-        printf("%s\n", md_get_error_message(err));
+        printf("%s\n", md_error_get_message(err));
     }
     // return 0;
     md_courses_cleanup(courseArr);
 
-    mt_destroy_client(client);
+    md_client_destroy(client);
     fclose(f);
     curl_global_cleanup();
 }

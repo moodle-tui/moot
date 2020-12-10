@@ -6,8 +6,8 @@
 #include "wcwidth.h"
 #include <curl/curl.h>
 
-#include "client.h"
-#include "util.h"
+#include "moodle.h"
+// #include "util.h"
 
 /* Reads single line up to n bytes from file with \n removed. s should be at
    least n + 1 in length. 1 is returned if the line is too long and was cut off. */
@@ -118,7 +118,7 @@ void processNavigationRequest(int *highlightedOption, int nrOfOptions, _Bool *is
         }
 }
 
-void menuLoop (int depth, char *seperator, Courses courses, int *highlightedOptions) {
+void menuLoop (int depth, char *seperator, MDArray courses, int *highlightedOptions) {
     int *widthOfColumns = getWidthOfColumns(strlen(seperator));
     _Bool isOptionChosen = 0;
     while (!isOptionChosen) {
@@ -126,23 +126,23 @@ void menuLoop (int depth, char *seperator, Courses courses, int *highlightedOpti
         for (int i = 0; 1; ++i) {
             int emptyColumns = 0;
             if (courses.len > i)
-                printOption(courses.data[i].name, widthOfColumns[highlightedOptions[0]]);
+                printOption(MD_COURSES(courses)[i].name, widthOfColumns[highlightedOptions[0]]);
             else {
                 printSpaces(widthOfColumns[0]);
                 ++emptyColumns;
             }
             printf("%s", seperator);
 
-            if (courses.data[highlightedOptions[0]].topics.len > i)
-                printOption(courses.data[highlightedOptions[0]].topics.data[i].name, widthOfColumns[1]);
+            if (MD_COURSES(courses)[highlightedOptions[0]].topics.len > i)
+                printOption(MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[i].name, widthOfColumns[1]);
             else {
                 printSpaces(widthOfColumns[1]);
                 ++emptyColumns;
             }
             printf("%s", seperator);
 
-            if (courses.data[highlightedOptions[0]].topics.data[highlightedOptions[1]].modules.len > i)
-                printOption(courses.data[highlightedOptions[0]].topics.data[highlightedOptions[1]].modules.data[i].name, widthOfColumns[2]);
+            if (MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[highlightedOptions[1]].modules.len > i)
+                printOption(MD_MODULES(MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[highlightedOptions[1]].modules)[i].name, widthOfColumns[2]);
             else
                 ++emptyColumns;
             
@@ -162,14 +162,14 @@ int main () {
     FILE *f = fopen("../.token", "r");
     char token[100];
     fread_line(f, token, 99);
-    Client *client = mt_new_client(token, "https://emokymai.vu.lt");
+    MDClient *client = md_client_new(token, "https://emokymai.vu.lt");
 
-    ErrorCode err = ERR_NONE;
-    if ((err = mt_init_client(client))) {
-        printf("%d %s\n", err, getError(err));
+    MDError err = MD_ERR_NONE;
+    if ((err = md_client_init(client))) {
+        printf("%d %s\n", err, md_error_get_message(err));
         return 0;
     }
-    Courses courses = mt_get_courses(client, &err);
+    MDArray courses = md_client_fetch_courses(client, &err);
 
     char seperator[] = "  ";
     int highlightedOptions[3] = {0};
@@ -177,9 +177,9 @@ int main () {
     _Bool isOptionChosen = 0;
     menuLoop(1, seperator, courses, highlightedOptions);
 
-    mt_free_courses(courses);
+    md_courses_cleanup(courses);
 
-    mt_destroy_client(client);
+    md_client_destroy(client);
     fclose(f);
     curl_global_cleanup();
 }
