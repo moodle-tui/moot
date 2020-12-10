@@ -23,14 +23,14 @@ $(LIB): $(LIB_OBJ)
 
 $(MOODLE): $(LIB) $(MOODLE_OBJ)
 
-TEST = moodle/test/test
+TEST = ui/ui
 test: $(MOODLE_OBJ) $(LIB_OBJ)
-	$(CC) $(TEST).c $^ $(INCLUDE_MOODLE) $(LDLIBS) -o $(TEST)
+	$(CC) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $(TEST).o
 
 clean:
 	rm -f $(LIB_OBJ)
 	rm -f $(MOODLE_OBJ)
 	rm -f $(TEST_OBJ)
-	rm -f $(TEST)
+	rm -f $(TEST).o
 
 .PHONY: all $(LIB) $(MOODLE) clean test
