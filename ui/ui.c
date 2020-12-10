@@ -8,7 +8,6 @@
 
 #include "client.h"
 #include "util.h"
-//#include "course_example.c"
 
 /* Reads single line up to n bytes from file with \n removed. s should be at
    least n + 1 in length. 1 is returned if the line is too long and was cut off. */
@@ -119,52 +118,31 @@ void processNavigationRequest(int *highlightedOption, int nrOfOptions, _Bool *is
         }
 }
 
-int main () {
-    curl_global_init(CURL_GLOBAL_ALL);
-
-    FILE *f = fopen("../.token", "r");
-    char token[100];
-    fread_line(f, token, 99);
-    Client *client = mt_new_client(token, "https://emokymai.vu.lt");
-
-    ErrorCode err = ERR_NONE;
-    if (!(err = mt_init_client(client))) {
-        printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
-        printf("%d\n", err);
-    } else {
-        printf("%d %s\n", err, getError(err));
-        return 0;
-    }
-    Courses courses = mt_get_courses(client, &err);
-
-    int initRow = 0;
-    char seperator[] = "  ";
+void menuLoop (int depth, char *seperator, Courses courses, int *highlightedOptions) {
     int *widthOfColumns = getWidthOfColumns(strlen(seperator));
-    int highlightedOptions[3] = {0};
-    int emptyColumns;
     _Bool isOptionChosen = 0;
     while (!isOptionChosen) {
         cls();
         for (int i = 0; 1; ++i) {
-            emptyColumns = 0;
+            int emptyColumns = 0;
             if (courses.len > i)
-                printOption(courses.data[i].name, widthOfColumns[0]);
+                printOption(courses.data[i].name, widthOfColumns[highlightedOptions[0]]);
             else {
                 printSpaces(widthOfColumns[0]);
                 ++emptyColumns;
             }
             printf("%s", seperator);
 
-            if (courses.data[5].topics.len > i)
-                printOption(courses.data[5].topics.data[i].name, widthOfColumns[1]);
+            if (courses.data[highlightedOptions[0]].topics.len > i)
+                printOption(courses.data[highlightedOptions[0]].topics.data[i].name, widthOfColumns[1]);
             else {
                 printSpaces(widthOfColumns[1]);
                 ++emptyColumns;
             }
             printf("%s", seperator);
 
-            if (courses.data[5].topics.data[3].modules.len > i)
-                printOption(courses.data[5].topics.data[3].modules.data[i].name, widthOfColumns[2]);
+            if (courses.data[highlightedOptions[0]].topics.data[highlightedOptions[1]].modules.len > i)
+                printOption(courses.data[highlightedOptions[0]].topics.data[highlightedOptions[1]].modules.data[i].name, widthOfColumns[2]);
             else
                 ++emptyColumns;
             
@@ -176,6 +154,29 @@ int main () {
         getch();
         //processNavigationRequest(&highlightedOptions[1], 2, &isOptionChosen);
     }
+}
+
+int main () {
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    FILE *f = fopen("../.token", "r");
+    char token[100];
+    fread_line(f, token, 99);
+    Client *client = mt_new_client(token, "https://emokymai.vu.lt");
+
+    ErrorCode err = ERR_NONE;
+    if ((err = mt_init_client(client))) {
+        printf("%d %s\n", err, getError(err));
+        return 0;
+    }
+    Courses courses = mt_get_courses(client, &err);
+
+    char seperator[] = "  ";
+    int highlightedOptions[3] = {0};
+    int emptyColumns;
+    _Bool isOptionChosen = 0;
+    menuLoop(1, seperator, courses, highlightedOptions);
+
     mt_free_courses(courses);
 
     mt_destroy_client(client);
