@@ -1,10 +1,8 @@
 #ifndef __MOODLE_H
 #define __MOODLE_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <time.h>
 #include "stdbool.h"
-#include "error.h"
 
 // MDArray is generic array. When accessing elements, it should be casted using macro MD_ARR;
 // E. g.: Array numbers = MD_MAKE_ARR(int, 1, 2, 3); MD_ARR(numbers, int)[0] == 1;

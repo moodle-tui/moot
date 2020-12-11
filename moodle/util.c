@@ -1,39 +1,11 @@
-#include "util.h"
-#include "error.h"
-#include "json.h"
-#include <assert.h>
 #include <curl/curl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "internal.h"
+#include "json.h"
 #define MAX_PARALLEL 20
-
-void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callback, MDError *error) {
-    array->len = length;
-    if (size && length) {
-        array->_data = calloc(length, size);
-        if (!array->_data) {
-            *error = MD_ERR_ALLOC;
-        } else if (callback) {
-            for (int i = 0; i < length; ++i) {
-                callback(array->_data + i * size, error);
-            }
-        }
-    } else {
-        array->_data = NULL;
-    }
-}
-
-void md_array_cleanup(MDArray *array, size_t size, MDCleanupFunc callback) {
-    if (callback) {
-        for (int i = 0; i < array->len; ++i)
-            callback(array->_data + i * size);
-    }
-    free(array->_data);
-    array->len = 0;
-    array->_data = NULL;
-}
 
 // struct to temporarily hold data while performing http request.
 struct Memblock;
@@ -45,17 +17,6 @@ struct Memblock {
     char *memory;
     size_t size;
 };
-
-json_value *json_get_by_key(json_value *json, const char *key) {
-    if (json->type != json_object)
-        return NULL;
-    for (int i = 0; i < json->u.object.length; ++i) {
-        if (strcmp(json->u.object.values[i].name, key) == 0) {
-            return json->u.object.values[i].value;
-        }
-    }
-    return NULL;
-}
 
 // CURL callback to write data to Memblock;
 static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -85,7 +46,7 @@ char *clone_str(const char *s) {
     return str;
 }
 
-char *cloneStrErr(const char *s, MDError *error) {
+char *clone_str_error(const char *s, MDError *error) {
     char *str = clone_str(s);
     if (!str)
         *error = MD_ERR_ALLOC;
@@ -109,7 +70,7 @@ static size_t write_stream_callback(void *contents, size_t size, size_t nmemb, v
     return fwrite(contents, size, nmemb, (FILE *)stream);
 }
 
-void http_request_to_file(char *url, FILE *stream, MDError *error) {
+void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
     CURL *handle = createCurl(url, (void *)stream, write_stream_callback);
     CURLcode res = curl_easy_perform(handle);
 
@@ -121,7 +82,7 @@ void http_request_to_file(char *url, FILE *stream, MDError *error) {
     curl_easy_cleanup(handle);
 }
 
-char *httpRequest(char *url, MDError *error) {
+char *http_get_request(char *url, MDError *error) {
     CURL *curl_handle;
     CURLcode res;
 
@@ -146,7 +107,7 @@ char *httpRequest(char *url, MDError *error) {
     return chunk.memory;
 }
 
-char **httpMultiRequest(char *urls[], unsigned int size, MDError *error) {
+char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
     CURLM *cm;
     CURLMsg *msg;
     unsigned int transfers = 0;
@@ -207,7 +168,7 @@ char **httpMultiRequest(char *urls[], unsigned int size, MDError *error) {
     return result;
 }
 
-char *httpPostFile(const char *url, const char *filename, const char *name, MDError *error) {
+char *http_post_file(const char *url, const char *filename, const char *name, MDError *error) {
     struct Memblock chunk;
     chunk.size = 0;
     chunk.memory = (char *)malloc(1);
@@ -258,8 +219,20 @@ char *httpPostFile(const char *url, const char *filename, const char *name, MDEr
     return chunk.memory;
 }
 
-json_value *getJsonProperty(json_value *json, const char *key, json_type type, MDError *error) {
-    json_value *value = json_get_by_key(json, key);
+
+json_value *json_get_property_silent(json_value *json, const char *key) {
+    if (json->type != json_object)
+        return NULL;
+    for (int i = 0; i < json->u.object.length; ++i) {
+        if (strcmp(json->u.object.values[i].name, key) == 0) {
+            return json->u.object.values[i].value;
+        }
+    }
+    return NULL;
+}
+
+json_value *json_get_property(json_value *json, const char *key, json_type type, MDError *error) {
+    json_value *value = json_get_property_silent(json, key);
     if (value) {
         if (value->type != type) {
             *error = MD_ERR_INVALID_JSON_VALUE;
@@ -272,97 +245,42 @@ json_value *getJsonProperty(json_value *json, const char *key, json_type type, M
     return value;
 }
 
-long jsonGetInteger(json_value *json, const char *key, MDError *error) {
-    json_value *value = getJsonProperty(json, key, json_integer, error);
+long json_get_integer(json_value *json, const char *key, MDError *error) {
+    json_value *value = json_get_property(json, key, json_integer, error);
     if (value)
         return value->u.integer;
     return 0;
 }
 
-int jsonGetBool(json_value *json, const char *key, MDError *error) {
-    json_value *value = getJsonProperty(json, key, json_boolean, error);
+int json_get_bool(json_value *json, const char *key, MDError *error) {
+    json_value *value = json_get_property(json, key, json_boolean, error);
     if (value)
         return value->u.boolean;
     return 0;
 }
 
-char *jsonGetString(json_value *json, const char *key, MDError *error) {
+char *json_get_string(json_value *json, const char *key, MDError *error) {
     MDError prev = *error;
-    json_value *value = getJsonProperty(json, key, json_string, error);
+    json_value *value = json_get_property(json, key, json_string, error);
     if (*error == MD_ERR_INVALID_JSON_VALUE) {
-        value = getJsonProperty(json, key, json_null, error);
+        value = json_get_property(json, key, json_null, error);
         if (value) {
             *error = prev;
             return NULL;
         }
     }
     if (value)
-        return cloneStrErr(value->u.string.ptr, error);
+        return clone_str_error(value->u.string.ptr, error);
     return NULL;
 }
 
-const char *jsonGetStringNoAlloc(json_value *json, const char *key, MDError *error) {
-    json_value *value = getJsonProperty(json, key, json_string, error);
+const char *json_get_string_no_alloc(json_value *json, const char *key, MDError *error) {
+    json_value *value = json_get_property(json, key, json_string, error);
     if (value)
         return value->u.string.ptr;
     return NULL;
 }
 
-json_value *jsonGetArray(json_value *json, const char *key, MDError *error) {
-    return getJsonProperty(json, key, json_array, error);
-}
-
-// a - json_array, o - json_object, i/d - int, l - long, s - char*
-MDError assingJsonValues(json_value *json, const char *format, ...) {
-    if (json->type != json_object)
-        return MD_ERR_INVALID_JSON_VALUE;
-    va_list args;
-    va_start(args, format);
-    for (int i = 0; format[i]; ++i) {
-        const char *name = va_arg(args, const char *);
-        json_value *val = json_get_by_key(json, name);
-        if (!val) {
-            md_set_error_message(name);
-            return MD_ERR_MISSING_JSON_KEY;
-        }
-
-        switch (format[i]) {
-        case 'd':
-        case 'i':
-            if (val->type == json_integer) {
-                *va_arg(args, int *) = val->u.integer;
-                break;
-            } else
-                return MD_ERR_INVALID_JSON_VALUE;
-
-        case 'l':
-            printf("{%d}", val->type);
-            if (val->type == json_integer) {
-                *va_arg(args, long *) = val->u.integer;
-                break;
-            } else
-                return MD_ERR_INVALID_JSON_VALUE;
-
-        case 's':
-            if (val->type == json_string) {
-                char **str = va_arg(args, char **);
-                *str = clone_str(val->u.string.ptr);
-                if (!*str)
-                    return MD_ERR_ALLOC;
-                break;
-            } else
-                return MD_ERR_INVALID_JSON_VALUE;
-
-        case 'a':
-            if (val->type == json_array) {
-                *va_arg(args, json_value **) = val;
-                break;
-            } else
-                return MD_ERR_INVALID_JSON_VALUE;
-        default:
-            assert(0);
-        }
-    }
-    va_end(args);
-    return MD_ERR_NONE;
+json_value *json_get_array(json_value *json, const char *key, MDError *error) {
+    return json_get_property(json, key, json_array, error);
 }

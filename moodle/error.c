@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "error.h"
 #include "moodle.h"
+#include "internal.h"
+
 #define MESSAGE_SIZE 4096
 
 char msg[MESSAGE_SIZE] = "";
@@ -27,7 +28,6 @@ struct errorMsg{
 void md_set_error_message(const char *message) {
     snprintf(msg, MESSAGE_SIZE, "%s", message);
 }
-
 
 const char *md_error_get_message(MDError code) {
     errBuff[0] = 0;
