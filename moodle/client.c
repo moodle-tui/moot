@@ -524,7 +524,7 @@ void md_rich_text_cleanup(MDRichText* richText) {
 }
 
 void md_file_submission_init(MDFileSubmission* submission) {
-    submission->status = MOD_SUBMISSION_DISABLED;
+    submission->status = MD_SUBMISSION_DISABLED;
     submission->maxUploadedFiles = MD_NO_FILE_LIMIT;
     submission->maxSubmissionSize = 0;
     submission->acceptedFileTypes = NULL;
@@ -557,7 +557,7 @@ void mt_parse_assignment_plugins(json_value* configs, MDModAssignment* assignmen
             if (*error)
                 break;
             if (strcmp(name, "enabled") == 0)
-                assignment->fileSubmission.status = !atoi(value) ? MOD_SUBMISSION_DISABLED : MOD_SUBMISSION_REQUIRED;
+                assignment->fileSubmission.status = !atoi(value) ? MD_SUBMISSION_DISABLED : MD_SUBMISSION_REQUIRED;
             else if (strcmp(name, "maxfilesubmissions") == 0)
                 assignment->fileSubmission.maxUploadedFiles = atoi(value);
             else if (strcmp(name, "filetypeslist") == 0)
@@ -663,7 +663,7 @@ void mt_client_courses_set_mod_workshop_data(MDClient* client, MDArray courses, 
             workshop->instructions.text = jsonGetString(jsonWorkshop, "instructauthors", error);
             workshop->instructions.format = jsonGetInteger(jsonWorkshop, "instructauthorsformat", error);
             workshop->fileSubmission.status = jsonGetInteger(jsonWorkshop, "submissiontypefile", error);
-            if (workshop->fileSubmission.status != MOD_SUBMISSION_DISABLED) {
+            if (workshop->fileSubmission.status != MD_SUBMISSION_DISABLED) {
                 workshop->fileSubmission.acceptedFileTypes = jsonGetString(jsonWorkshop, "submissionfiletypes", error);
                 workshop->fileSubmission.maxSubmissionSize = jsonGetInteger(jsonWorkshop, "maxbytes", error);
                 if (workshop->fileSubmission.maxSubmissionSize == 0)

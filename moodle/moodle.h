@@ -84,9 +84,9 @@ typedef struct MDFile {
 
 // MDSubmissionStatus denotes the status of a submission, as it may be changed by teachers.
 typedef enum MDSubmissionStatus {
-    MOD_SUBMISSION_DISABLED = 0,
-    MOD_SUBMISSION_ENABLED = 1,
-    MOD_SUBMISSION_REQUIRED = 2,
+    MD_SUBMISSION_DISABLED = 0,
+    MD_SUBMISSION_ENABLED = 1,
+    MD_SUBMISSION_REQUIRED = 2,
 } MDSubmissionStatus;
 
 // MDFileSubmission, if enabled, allows to submit single or multiple files.

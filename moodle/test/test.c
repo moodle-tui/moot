@@ -27,9 +27,10 @@ int fread_line(FILE *file, char *s, int n) {
 
 void test_upload() {
     // https://school.moodledemo.net/login/token.php?username=markellis267&password=moodle&service=moodle_mobile_app
-    MDClient *client = md_client_new("00aa0cd99c8a55577ee8d2987641d4d4", "https://school.moodledemo.net");
     MDError err = 0;
-    if (!(err = md_client_init(client))) {
+    MDClient *client = md_client_new("00aa0cd99c8a55577ee8d2987641d4d4", "https://school.moodledemo.net", &err);
+    md_client_init(client, &err);
+    if (!err) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
 
         // Module mod = {665, 101, MODULE_ASSIGNMENT, "name"};
@@ -57,8 +58,9 @@ int main() {
     FILE *f = fopen(".token", "r");
     char token[100];
     fread_line(f, token, 99);
-    MDClient *client = md_client_new(token, "https://emokymai.vu.lt");
-    if (!(err = md_client_init(client))) {
+    MDClient *client = md_client_new(token, "https://emokymai.vu.lt", &err);
+    md_client_init(client, &err);
+    if (!err) {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
         printf("%d\n", err);
         // return 0;
