@@ -33,14 +33,14 @@ void test_upload() {
         printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
 
         // Module mod = {665, 101, MODULE_ASSIGNMENT, "name"};
-        MDModule wk = {90, 1, MD_MODULE_WORKSHOP, "name"};
+        MDModule wk = {90, 1, MD_MOD_WORKSHOP, "name"};
 
         md_client_mod_workshop_submit(client, &wk, MD_MAKE_ARR(const char *, "README.md"), "t", &err);
         printf("%s\n", md_error_get_message(err));
     } else {
         printf("%d %s\n", err, md_error_get_message(err));
     }
-    md_client_destroy(client);
+    md_client_cleanup(client);
 }
 
 int main() {
@@ -78,7 +78,7 @@ int main() {
                 printf(" - %s\n", MD_TOPICS(courses[i].topics)[j].name);
                 for (int k = 0; k < modules.len; ++k) {
                     printf("  - %s\n", MD_MODULES(modules)[k].name);
-                    if (MD_MODULES(modules)[k].type == MD_MODULE_RESOURCE) {
+                    if (MD_MODULES(modules)[k].type == MD_MOD_RESOURCE) {
                         for (int a = 0; a < MD_MODULES(modules)[k].contents.resource.files.len; ++a) {
                             printf("[%s]\n", MD_FILES(MD_MODULES(modules)[k].contents.resource.files)[a].filename);
                             FILE *f = fopen(MD_FILES(MD_MODULES(modules)[k].contents.resource.files)[a].filename, "w");
@@ -103,7 +103,7 @@ int main() {
     // return 0;
     md_courses_cleanup(courseArr);
 
-    md_client_destroy(client);
+    md_client_cleanup(client);
     fclose(f);
     curl_global_cleanup();
 }

@@ -8,9 +8,7 @@
 #include "moodle.h"
 #include "json.h"
 
-MDClient* md_client_new(char* token, char* website);
 void mt_client_write_url(MDClient* client, char* url, char* wsfunction, const char* format, ...);
-MDError md_client_init(MDClient* client);
 MDArray md_client_fetch_courses(MDClient* client, MDError* error);
 void md_array_init(MDArray* array);
 void md_course_init(MDCourse* course);
@@ -23,7 +21,7 @@ MDModType mt_get_mod_type(const char* module);
 MDArray mt_create_modules(json_value* json, MDError* error);
 MDArray mt_parse_topics(json_value* json, MDError* error);
 void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error);
-void md_client_destroy(MDClient* client);
+void md_client_cleanup(MDClient* client);
 json_value* mt_parse_moodle_json(char* data, MDError* error);
 long mt_client_upload_file(MDClient* client, const char* filename, long itemId, MDError* error);
 long mt_client_upload_files(MDClient* client, MDArray filenames, MDError* error);

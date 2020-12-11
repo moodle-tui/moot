@@ -207,10 +207,11 @@ int main () {
     FILE *f = fopen("../.token", "r");
     char token[100];
     fread_line(f, token, 99);
-    MDClient *client = md_client_new(token, "https://emokymai.vu.lt");
+    MDError err;
+    MDClient *client = md_client_new(token, "https://emokymai.vu.lt", &err);
 
-    MDError err = MD_ERR_NONE;
-    if ((err = md_client_init(client))) {
+    md_client_init(client, &err);
+    if (err) {
         printf("%d %s\n", err, md_error_get_message(err));
         return 0;
     }
@@ -225,7 +226,7 @@ int main () {
 
     md_courses_cleanup(courses);
 
-    md_client_destroy(client);
+    md_client_cleanup(client);
     fclose(f);
     curl_global_cleanup();
 }
