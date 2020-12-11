@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "error.h"
+#include "moodle.h"
 #define MESSAGE_SIZE 4096
 
 char msg[MESSAGE_SIZE] = "";

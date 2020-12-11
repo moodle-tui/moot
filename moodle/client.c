@@ -15,11 +15,16 @@
 #define NO_IDENTIFIER -1
 #define NO_ITEM_ID 0
 
-MDClient* md_client_new(char* token, char* website) {
+MDClient* md_client_new(char* token, char* website, MDError *error) {
+    *error = MD_ERR_NONE;
     MDClient* client = (MDClient*)malloc(sizeof(MDClient));
-    client->token = clone_str(token);
-    client->website = clone_str(website);
-    client->fullName = client->siteName = NULL;
+    if (client) {
+        client->token = cloneStrErr(token, error);
+        client->website = cloneStrErr(website, error);
+        client->fullName = client->siteName = NULL;
+    } else {
+        *error = MD_ERR_ALLOC;
+    }
     return client;
 }
 
@@ -55,17 +60,15 @@ void mt_client_write_url(MDClient* client, char* url, char* wsfunction, const ch
     va_end(args);
 }
 
-MDError md_client_init(MDClient* client) {
-    MDError err = MD_ERR_NONE;
-    json_value* json = md_client_do_http_json_request(client, &err, "core_webservice_get_site_info", "");
-
-    if (!err) {
-        err = assingJsonValues(json, "ssd", "fullname", &client->fullName, "sitename", &client->siteName, "userid",
+void md_client_init(MDClient* client, MDError *error) {
+    *error = MD_ERR_NONE;
+    json_value* json = md_client_do_http_json_request(client, error, "core_webservice_get_site_info", "");
+    if (!*error) {
+        *error = assingJsonValues(json, "ssd", "fullname", &client->fullName, "sitename", &client->siteName, "userid",
                                &client->userid);
-        client->uploadLimit = jsonGetInteger(json, "usermaxuploadfilesize", &err);
+        client->uploadLimit = jsonGetInteger(json, "usermaxuploadfilesize", error);
     }
     json_value_free(json);
-    return err;
 }
 
 MDArray md_client_fetch_courses(MDClient* client, MDError* error) {
@@ -154,10 +157,10 @@ void md_module_cleanup(MDModule* module) {
         case MD_MOD_ASSIGNMENT:
             md_mod_assignment_cleanup(&module->contents.assignment);
             break;
-        case MD_MODULE_WORKSHOP:
+        case MD_MOD_WORKSHOP:
             md_mod_workshop_cleanup(&module->contents.workshop);
             break;
-        case MD_MODULE_RESOURCE:
+        case MD_MOD_RESOURCE:
             md_mod_resource_cleanup(&module->contents.resource);
             break;
     }
@@ -167,9 +170,9 @@ MDModType mt_get_mod_type(const char* module) {
     if (!strcmp(module, "assign"))
         return MD_MOD_ASSIGNMENT;
     if (!strcmp(module, "resource"))
-        return MD_MODULE_RESOURCE;
+        return MD_MOD_RESOURCE;
     if (!strcmp(module, "workshop"))
-        return MD_MODULE_WORKSHOP;
+        return MD_MOD_WORKSHOP;
     return MD_MOD_UNSUPPORTED;
 }
 
@@ -193,10 +196,10 @@ MDArray mt_create_modules(json_value* json, MDError* error) {
                 case MD_MOD_ASSIGNMENT:
                     md_mod_assignment_init(&modules[i - skip].contents.assignment);
                     break;
-                case MD_MODULE_WORKSHOP:
+                case MD_MOD_WORKSHOP:
                     md_mod_workshop_init(&modules[i - skip].contents.workshop);
                     break;
-                case MD_MODULE_RESOURCE:
+                case MD_MOD_RESOURCE:
                     md_mod_resource_init(&modules[i - skip].contents.resource);
                     break;
             }
@@ -252,8 +255,8 @@ void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error) {
                             MD_ARR(courses, MDCourse)[i].id);
     }
     mt_client_write_url(client, urls[count - MD_MOD_ASSIGNMENT], "mod_assign_get_assignments", "");
-    mt_client_write_url(client, urls[count - MD_MODULE_WORKSHOP], "mod_workshop_get_workshops_by_courses", "");
-    mt_client_write_url(client, urls[count - MD_MODULE_RESOURCE], "mod_resource_get_resources_by_courses", "");
+    mt_client_write_url(client, urls[count - MD_MOD_WORKSHOP], "mod_workshop_get_workshops_by_courses", "");
+    mt_client_write_url(client, urls[count - MD_MOD_RESOURCE], "mod_resource_get_resources_by_courses", "");
 
     char* urlArray[count];
     for (int i = 0; i < count; ++i)
@@ -280,11 +283,11 @@ void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error) {
         if (assignmentsData) {
             mt_client_courses_set_mod_assign_data(client, courses, assignmentsData, error);
         }
-        char* workshopsData = results[count - MD_MODULE_WORKSHOP];
+        char* workshopsData = results[count - MD_MOD_WORKSHOP];
         if (workshopsData) {
             mt_client_courses_set_mod_workshop_data(client, courses, workshopsData, error);
         }
-        char* resourcesData = results[count - MD_MODULE_RESOURCE];
+        char* resourcesData = results[count - MD_MOD_RESOURCE];
         if (resourcesData) {
             mt_client_courses_set_mod_resource_data(client, courses, resourcesData, error);
         }
@@ -294,7 +297,7 @@ void mt_load_courses_topics(MDClient* client, MDArray courses, MDError* error) {
     free(results);
 }
 
-void md_client_destroy(MDClient* client) {
+void md_client_cleanup(MDClient* client) {
     free(client->token);
     free(client->website);
     free(client->fullName);
@@ -403,7 +406,7 @@ void md_client_mod_workshop_submit(MDClient* client,
                                    MDArray filenames,
                                    const char* title,
                                    MDError* error) {
-    *error = workshop->type == MD_MODULE_WORKSHOP ? MD_ERR_NONE : MD_ERR_MISUSED_MOODLE_API;
+    *error = workshop->type == MD_MOD_WORKSHOP ? MD_ERR_NONE : MD_ERR_MISUSED_MOODLE_API;
     if (*error)
         return;
     long itemId = mt_client_upload_files(client, filenames, error);
@@ -476,7 +479,7 @@ MDArray mt_parse_files(json_value* jsonFiles, MDError* error) {
 // }
 
 void md_mod_assignment_init(MDModAssignment* assignment) {
-    assignment->fromDate = assignment->dueDate = assignment->cutOffDate = DATE_NONE;
+    assignment->fromDate = assignment->dueDate = assignment->cutOffDate = MD_DATE_NONE;
     md_rich_text_init(&assignment->description);
     md_file_submission_init(&assignment->fileSubmission);
 }
@@ -488,7 +491,7 @@ void md_mod_assignment_cleanup(MDModAssignment* assignment) {
 }
 
 void md_mod_workshop_init(MDModWorkshop* workshop) {
-    workshop->fromDate = workshop->dueDate = DATE_NONE;
+    workshop->fromDate = workshop->dueDate = MD_DATE_NONE;
     md_rich_text_init(&workshop->description);
     md_rich_text_init(&workshop->instructions);
     workshop->lateSubmissions = false;
@@ -521,8 +524,8 @@ void md_rich_text_cleanup(MDRichText* richText) {
 }
 
 void md_file_submission_init(MDFileSubmission* submission) {
-    submission->status = SUBMISSION_DISABLED;
-    submission->maxUploadedFiles = NO_FILE_LIMIT;
+    submission->status = MOD_SUBMISSION_DISABLED;
+    submission->maxUploadedFiles = MD_NO_FILE_LIMIT;
     submission->maxSubmissionSize = 0;
     submission->acceptedFileTypes = NULL;
 }
@@ -554,7 +557,7 @@ void mt_parse_assignment_plugins(json_value* configs, MDModAssignment* assignmen
             if (*error)
                 break;
             if (strcmp(name, "enabled") == 0)
-                assignment->fileSubmission.status = !atoi(value) ? SUBMISSION_DISABLED : SUBMISSION_REQUIRED;
+                assignment->fileSubmission.status = !atoi(value) ? MOD_SUBMISSION_DISABLED : MOD_SUBMISSION_REQUIRED;
             else if (strcmp(name, "maxfilesubmissions") == 0)
                 assignment->fileSubmission.maxUploadedFiles = atoi(value);
             else if (strcmp(name, "filetypeslist") == 0)
@@ -650,7 +653,7 @@ void mt_client_courses_set_mod_workshop_data(MDClient* client, MDArray courses, 
             MDModule* module = mt_locate_courses_module(course, instance, error);
             if (*error)
                 break;
-            module->type = MD_MODULE_WORKSHOP;
+            module->type = MD_MOD_WORKSHOP;
             MDModWorkshop* workshop = &module->contents.workshop;
             workshop->fromDate = jsonGetInteger(jsonWorkshop, "submissionstart", error);
             workshop->dueDate = jsonGetInteger(jsonWorkshop, "submissionend", error);
@@ -660,7 +663,7 @@ void mt_client_courses_set_mod_workshop_data(MDClient* client, MDArray courses, 
             workshop->instructions.text = jsonGetString(jsonWorkshop, "instructauthors", error);
             workshop->instructions.format = jsonGetInteger(jsonWorkshop, "instructauthorsformat", error);
             workshop->fileSubmission.status = jsonGetInteger(jsonWorkshop, "submissiontypefile", error);
-            if (workshop->fileSubmission.status != SUBMISSION_DISABLED) {
+            if (workshop->fileSubmission.status != MOD_SUBMISSION_DISABLED) {
                 workshop->fileSubmission.acceptedFileTypes = jsonGetString(jsonWorkshop, "submissionfiletypes", error);
                 workshop->fileSubmission.maxSubmissionSize = jsonGetInteger(jsonWorkshop, "maxbytes", error);
                 if (workshop->fileSubmission.maxSubmissionSize == 0)
@@ -702,7 +705,7 @@ void mt_client_courses_set_mod_resource_data(MDClient* client, MDArray courses, 
             MDModule* module = mt_locate_courses_module(course, instance, error);
             if (*error)
                 break;
-            module->type = MD_MODULE_RESOURCE;
+            module->type = MD_MOD_RESOURCE;
             MDModResource* resource = &module->contents.resource;
             resource->description.text = jsonGetString(jsonResource, "intro", error);
             resource->description.format = jsonGetInteger(jsonResource, "introformat", error);

@@ -39,7 +39,7 @@ int main() {
     }
     mt_free_courses(courses);
 
-    md_client_destroy(client);
+    md_client_cleanup(client);
     fclose(f);
     curl_global_cleanup();
 }
