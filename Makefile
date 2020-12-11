@@ -12,6 +12,10 @@ MOODLE = moodle
 MOODLE_SRC = $(wildcard $(MOODLE)/*.c)
 MOODLE_OBJ = $(MOODLE_SRC:%.c=%.o)
 
+UI = ui
+UI_SRC = $(wildcard $(UI)/*.c)
+UI_OBJ = $(UI_SRC:%.c=%.o)
+
 all: $(MOODLE_OBJ)
 
 $(LIB)/%.o: $(LIB)/%.c
@@ -20,18 +24,18 @@ $(LIB)/%.o: $(LIB)/%.c
 $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) -c $< $(INCLUDE_LIB) -o $@
 
+$(UI_OBJ): $(UI_SRC) $(MOODLE_OBJ) $(LIB_OBJ)
+	$(CC) $(CCFLAGS) $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
+
 $(LIB): $(LIB_OBJ)
 
 $(MOODLE): $(LIB) $(MOODLE_OBJ)
 
-TEST = ui/ui
-test: $(MOODLE_OBJ) $(LIB_OBJ)
-	$(CC) $(CCFLAGS) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $(TEST).o
+$(UI): $(UI_OBJ)
 
 clean:
 	rm -f $(LIB_OBJ)
 	rm -f $(MOODLE_OBJ)
-	rm -f $(TEST_OBJ)
-	rm -f $(TEST).o
+	rm -f $(UI_OBJ)
 
 .PHONY: all $(LIB) $(MOODLE) clean test
