@@ -9,6 +9,11 @@
 #include "moodle.h"
 // #include "util.h"
 
+typedef struct menuInfo {
+    int depth, *widths, HLOptions[3];
+    char *seperator;
+} MenuInfo;
+
 /* Reads single line up to n bytes from file with \n removed. s should be at
    least n + 1 in length. 1 is returned if the line is too long and was cut off. */
 int fread_line(FILE *file, char *s, int n) {
@@ -27,7 +32,11 @@ int fread_line(FILE *file, char *s, int n) {
     return cutOff;
 }
 
-int *getWidthOfColumns(int sepLength) {
+int getBigger(int a, int b) {
+    return a > b? a: b;
+}
+
+int *getWidthsOfOptions(int sepLength) {
     int *widthOfColumns = malloc(sizeof(int) * 3);
     int availableColumns = tcols();
     widthOfColumns[0] = (availableColumns / 6) - sepLength;
@@ -40,7 +49,7 @@ void printSpaces(int count) {
     printf("%*s", count, "");
 }
 
-void printOption(char *optionName, int width) {
+void printPlainOption(char *optionName, int width) {
     Rune u;
     int printedChWidth = 0, printedChSize = 0;
     int optionLength = strlen(optionName);
@@ -70,7 +79,7 @@ void printHighlightedOption(char *optionName, int width) {
     saveDefaultColor();
     setBackgroundColor(7);
     setColor(0);
-    printOption(optionName, width);
+    printPlainOption(optionName, width);
     resetColor();
 }
 
@@ -118,41 +127,77 @@ void processNavigationRequest(int *highlightedOption, int nrOfOptions, _Bool *is
         }
 }
 
-void menuLoop (int depth, char *seperator, MDArray courses, int *highlightedOptions) {
-    int *widthOfColumns = getWidthOfColumns(strlen(seperator));
+void printOption(char *name, int width, _Bool isHighlighted) {
+    if (isHighlighted)
+        printHighlightedOption(name, width);
+    else
+        printPlainOption(name, width);
+}
+
+void fillOptionRow(MDArray mdArray, MenuInfo *menuInfo, int rowIndex, int optionsIndex) {
+    int widthIndex = optionsIndex - menuInfo->depth;
+    if (widthIndex < 0)
+        return;
+    
+    if (mdArray.len > rowIndex) {
+        switch (optionsIndex) {
+        case 0:
+            printOption(MD_COURSES(mdArray)[rowIndex].name,
+                        menuInfo->widths[widthIndex],
+                        menuInfo->HLOptions[optionsIndex] == rowIndex);
+            break;
+        case 1:
+            printOption(MD_TOPICS(mdArray)[rowIndex].name,
+                        menuInfo->widths[widthIndex],
+                        menuInfo->HLOptions[optionsIndex] == rowIndex);
+            break;
+        case 2:
+            printOption(MD_MODULES(mdArray)[rowIndex].name,
+                        menuInfo->widths[widthIndex],
+                        menuInfo->HLOptions[optionsIndex] == rowIndex);
+            break;
+        default:
+            printf("Wrong option index\n");
+        }
+    }
+    else
+        printSpaces(menuInfo->widths[widthIndex]);
+}
+
+void printMenu(MDArray courses, MenuInfo *menuInfo, int height) {
+    int *hl = menuInfo->HLOptions;
+
+    for (int i = 0; i < height; ++i) {
+        fillOptionRow(courses, menuInfo, i, 0);
+        printf("%s", menuInfo->seperator);
+
+        fillOptionRow(MD_COURSES(courses)[hl[0]].topics, menuInfo, i, 1);
+        printf("%s", menuInfo->seperator);
+
+        fillOptionRow(MD_TOPICS(MD_COURSES(courses)[hl[0]].topics)[hl[1]].modules,
+                      menuInfo, i, 2);
+        printf("\n");
+    }
+}
+
+void menuLoop (MDArray courses, MenuInfo *menuInfo) {
+    printf("In the menu loop\n");
+    menuInfo->widths = getWidthsOfOptions(strlen(menuInfo->seperator));
+
+    int *hl = menuInfo->HLOptions;
+    int heights[3] = {
+        courses.len,
+        MD_COURSES(courses)[hl[0]].topics.len,
+        MD_TOPICS(MD_COURSES(courses)[hl[0]].topics)[hl[1]].modules.len
+    };
+    int maxHeight = getBigger(heights[0], getBigger(heights[1], heights[2]));
+
     _Bool isOptionChosen = 0;
     while (!isOptionChosen) {
         cls();
-        for (int i = 0; 1; ++i) {
-            int emptyColumns = 0;
-            if (courses.len > i)
-                printOption(MD_COURSES(courses)[i].name, widthOfColumns[highlightedOptions[0]]);
-            else {
-                printSpaces(widthOfColumns[0]);
-                ++emptyColumns;
-            }
-            printf("%s", seperator);
-
-            if (MD_COURSES(courses)[highlightedOptions[0]].topics.len > i)
-                printOption(MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[i].name, widthOfColumns[1]);
-            else {
-                printSpaces(widthOfColumns[1]);
-                ++emptyColumns;
-            }
-            printf("%s", seperator);
-
-            if (MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[highlightedOptions[1]].modules.len > i)
-                printOption(MD_MODULES(MD_TOPICS(MD_COURSES(courses)[highlightedOptions[0]].topics)[highlightedOptions[1]].modules)[i].name, widthOfColumns[2]);
-            else
-                ++emptyColumns;
-            
-            if (emptyColumns == 3)
-                break;
-
-            printf("\n");
-        }
+        printMenu(courses, menuInfo, maxHeight);
         getch();
-        //processNavigationRequest(&highlightedOptions[1], 2, &isOptionChosen);
+        //processNavigationRequest(&HLOptions[1], 2, &isOptionChosen);
     }
 }
 
@@ -171,11 +216,12 @@ int main () {
     }
     MDArray courses = md_client_fetch_courses(client, &err);
 
-    char seperator[] = "  ";
-    int highlightedOptions[3] = {0};
-    int emptyColumns;
-    _Bool isOptionChosen = 0;
-    menuLoop(1, seperator, courses, highlightedOptions);
+    MenuInfo menuInfo = {
+        .HLOptions = {0},
+        .depth = 0,
+        .seperator = "  "
+    };
+    menuLoop(courses, &menuInfo);
 
     md_courses_cleanup(courses);
 

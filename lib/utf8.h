@@ -28,7 +28,6 @@ static size_t utf8decode(const char*, Rune*, size_t);
 static Rune utf8decodebyte(char, size_t*);
 static char utf8encodebyte(Rune, size_t);
 static size_t utf8validate(Rune*, size_t);
-static size_t utf8encode(Rune, char*);
 
 /* macros */
 #define LEN(a) (sizeof(a) / sizeof(a)[0])
