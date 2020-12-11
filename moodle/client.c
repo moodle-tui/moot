@@ -232,9 +232,9 @@ MDArray md_parse_modules(json_value* json, MDError* error) {
                     md_mod_resource_init(&modules[i - skip].contents.resource);
                     break;
             }
-            modules[i - skip].name = json_get_string(json, "name", error);
-            modules[i - skip].id = json_get_integer(json, "id", error);
-            modules[i - skip].instance = json_get_integer(json, "instance", error);
+            modules[i - skip].name = json_get_string(jsonModule, "name", error);
+            modules[i - skip].id = json_get_integer(jsonModule, "id", error);
+            modules[i - skip].instance = json_get_integer(jsonModule, "instance", error);
         }
         modulesArr.len -= skip;
     } else {
@@ -347,7 +347,7 @@ long mt_client_upload_file(MDClient* client, const char* filename, long itemId, 
     sprintf(url,
             "%s%s"
             "?token=%s"
-            "&itemid=%d",
+            "&itemid=%ld",
             client->website, MD_UPLOAD_URL, client->token, itemId);
     char* data = http_post_file(url, filename, "file_box", error);
     if (!*error) {

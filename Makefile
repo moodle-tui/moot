@@ -19,10 +19,10 @@ UI_OBJ = $(UI_SRC:%.c=%.o)
 all: $(MOODLE_OBJ)
 
 $(LIB)/%.o: $(LIB)/%.c
-	$(CC) -c $< -o $@
+	$(CC) $(CCFLAGS) -c $< -o $@
 
 $(MOODLE)/%.o: $(MOODLE)/%.c
-	$(CC) -c $< $(INCLUDE_LIB) -o $@
+	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) -o $@
 
 $(UI_OBJ): $(UI_SRC) $(MOODLE_OBJ) $(LIB_OBJ)
 	$(CC) $(CCFLAGS) $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
