@@ -24,7 +24,7 @@ $(LIB)/%.o: $(LIB)/%.c
 $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) -o $@
 
-$(UI_OBJ): $(UI_SRC) $(MOODLE_OBJ) $(LIB_OBJ)
+$(UI_OBJ): $(UI_SRC) $(MOODLE_OBJ) $(LIB_OBJ) $(LIB)/rlutil.h
 	$(CC) $(CCFLAGS) $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
 
 $(LIB): $(LIB_OBJ)
@@ -32,6 +32,10 @@ $(LIB): $(LIB_OBJ)
 $(MOODLE): $(LIB) $(MOODLE_OBJ)
 
 $(UI): $(UI_OBJ)
+
+TEST = moodle/test/test
+test: $(MOODLE_OBJ) $(LIB_OBJ)
+	$(CC) $(CCFLAGS) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $(TEST)
 
 clean:
 	rm -f $(LIB_OBJ)

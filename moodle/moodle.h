@@ -29,10 +29,11 @@ typedef struct MDArray {
 // MD_FILES casts a generic array to MDFile*.
 #define MD_FILES(array) MD_ARR(array, MDFile)
 
-// MD_MAKE_ARR returns typed array with given elements, tied to the current scoope. 
-#define MD_MAKE_ARR(type, ...) ((MDArray){.len = sizeof((type[]){__VA_ARGS__}) / sizeof(type), ._data = (void *)((type[]){__VA_ARGS__})})
+// MD_MAKE_ARR returns typed array with given elements, tied to the current scoope.
+#define MD_MAKE_ARR(type, ...) \
+    ((MDArray){.len = sizeof((type[]){__VA_ARGS__}) / sizeof(type), ._data = (void *)((type[]){__VA_ARGS__})})
 
-// MD_MAKE_ARR returns typed array with given length and elements, tied to the current scoope. 
+// MD_MAKE_ARR returns typed array with given length and elements, tied to the current scoope.
 #define MD_MAKE_ARR_LEN(type, length, ...) ((MDArray){.len = length, ._data = (void *)((type[length]){__VA_ARGS__})})
 
 // MD_DATE_NONE is a non existing date.
@@ -47,22 +48,23 @@ typedef struct MDClient {
     char *fullName, *siteName;
     int userid;
     long uploadLimit;
-    char *token, *website; // private
+    char *token, *website;  // private
 } MDClient;
 
-// MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely never be returned, 
+// MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely never be returned,
 // as unsuported modules are simply skipped when fetching courses.
 typedef enum MDModType {
     MD_MOD_UNSUPPORTED,
     MD_MOD_ASSIGNMENT = 1,
     MD_MOD_WORKSHOP = 2,
     MD_MOD_RESOURCE = 3,
+    MD_MOD_URL = 4,
 } MDModType;
 
 // MDTextFormat contains avaiable moodle text formats. HTML is used ussualy though.
 typedef enum MDTextFormat {
     MD_FORMAT_MOODLE = 0,
-    MD_FORMAT_HTML = 1, // Most often used format
+    MD_FORMAT_HTML = 1,  // Most often used format
     MD_FORMAT_PLAIN = 2,
     MD_FORMAT_MARKDOWN = 4,
 } MDTextFormat;
@@ -90,17 +92,17 @@ typedef enum MDSubmissionStatus {
 // MDFileSubmission, if enabled, allows to submit single or multiple files.
 typedef struct MDFileSubmission {
     MDSubmissionStatus status;
-    int maxUploadedFiles; // may be equal to MD_NO_FILE_LIMIT.
+    int maxUploadedFiles;  // may be equal to MD_NO_FILE_LIMIT.
     long maxSubmissionSize;
-    char *acceptedFileTypes;
+    char *acceptedFileTypes;  // may be NULL if file types are not limited.
 } MDFileSubmission;
 
 // MDModAssignment represents moodle assignment. Currently it only supports file submission, which
 // may be disabled.
 typedef struct MDModAssignment {
-    time_t fromDate, dueDate, cutOffDate; // May be equal to MD_DATE_NEVER
+    time_t fromDate, dueDate, cutOffDate;  // May be equal to MD_DATE_NEVER
     MDRichText description;
-    MDArray files; // Array with elements of type MDFile.
+    MDArray files;  // Array with elements of type MDFile.
 
     MDFileSubmission fileSubmission;
 } MDModAssignment;
@@ -108,8 +110,8 @@ typedef struct MDModAssignment {
 // MDModWorkshop represents moodle workshop. Currently it only supports file submission, which
 // may be disabled.
 typedef struct MDModWorkshop {
-    time_t fromDate, dueDate; // May be equal to MD_DATE_NEVER
-    bool lateSubmissions; // Allows submitting after due date if true.
+    time_t fromDate, dueDate;  // May be equal to MD_DATE_NEVER
+    bool lateSubmissions;      // Allows submitting after due date if true.
     MDRichText description, instructions;
 
     MDFileSubmission fileSubmission;
@@ -122,6 +124,12 @@ typedef struct MDModResource {
     MDArray files;
 } MDModResource;
 
+// MDModUrl represents moodle url module.
+typedef struct MDModUrl {
+    MDRichText description;
+    char *name, *url;
+} MDModUrl;
+
 // MDModule represents a general moodle module that specific module under contents. Modules are contained
 // in topics.
 typedef struct MDModule {
@@ -132,6 +140,7 @@ typedef struct MDModule {
         MDModAssignment assignment;
         MDModWorkshop workshop;
         MDModResource resource;
+        MDModUrl url;
     } contents;
 } MDModule;
 
@@ -140,7 +149,7 @@ typedef struct MDTopic {
     int id;
     char *name;
     MDRichText summary;
-    MDArray modules; // Array with elements of type MDModule.
+    MDArray modules;  // Array with elements of type MDModule.
 } MDTopic;
 
 // MDCourse represents a moodle course which contains topics;
@@ -189,18 +198,21 @@ void md_client_cleanup(MDClient *client);
 // be cleaned up later using md_courses_cleanup.
 MDArray md_client_fetch_courses(MDClient *client, MDError *error);
 
-//md_courses_cleanup releases all the resources owned by the list of courses.
-// @param courses MDArray with elements of type MDCourse. 
+// md_courses_cleanup releases all the resources owned by the list of courses.
+// @param courses MDArray with elements of type MDCourse.
 void md_courses_cleanup(MDArray courses);
 
 // md_client_mod_assign_submit submits an assignment module with given files.
-// @param filenames MDArray with elements of type const char * 
+// @param filenames MDArray with elements of type const char *
 void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray filenames, MDError *error);
 
 // md_client_mod_workshop_submit submits a workshop module with given files.
 // @param filenames MDArray with elements of type const char *
 // @param title A string that may not be empty
-void md_client_mod_workshop_submit(MDClient *client, MDModule *workshop, MDArray filenames, const char *title,
+void md_client_mod_workshop_submit(MDClient *client,
+                                   MDModule *workshop,
+                                   MDArray filenames,
+                                   const char *title,
                                    MDError *error);
 
 // md_client_download_file downloads the given file to the stream.

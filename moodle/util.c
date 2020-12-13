@@ -16,6 +16,7 @@ static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb,
 struct Memblock {
     char *memory;
     size_t size;
+    MDError *error;
 };
 
 // CURL callback to write data to Memblock;
@@ -23,11 +24,9 @@ static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb,
     size_t realsize = size * nmemb;
     struct Memblock *mem = (struct Memblock *)userp;
 
-    char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
-    if (ptr == NULL) {
-        fprintf(stderr, "not enough memory (realloc returned NULL)\n");
+    char *ptr = (char *)md_realloc(mem->memory, mem->size + realsize + 1, mem->error);
+    if (ptr == NULL)
         return 0;
-    }
 
     mem->memory = ptr;
     memcpy(&(mem->memory[mem->size]), contents, realsize);
@@ -37,32 +36,39 @@ static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb,
     return realsize;
 }
 
-char *clone_str(const char *s) {
-    char *str = (char *)malloc(strlen(s) + 1);
+void *md_malloc(size_t size, MDError *error) {
+    return md_realloc(NULL, size, error);
+}
+
+void *md_realloc(void *data, size_t size, MDError *error) {
+    data = realloc(data, size);
+    if (!data && size)
+        *error = MD_ERR_ALLOC;
+    return data;
+}
+
+char *clone_str(cchar *s, MDError *error) {
+    char *str = (char *)md_malloc(strlen(s) + 1, error);
     if (str) {
         strcpy(str, s);
     }
-
-    return str;
-}
-
-char *clone_str_error(const char *s, MDError *error) {
-    char *str = clone_str(s);
-    if (!str)
-        *error = MD_ERR_ALLOC;
     return str;
 }
 
 typedef size_t WriteCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
 
-CURL *createCurl(const char *url, void *data, WriteCallback callback) {
+CURL *createCurl(cchar *url, void *data, WriteCallback callback, MDError *error) {
     CURL *handle = curl_easy_init();
-    curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(handle, CURLOPT_URL, url);
-    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, callback);
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, data);
-    curl_easy_setopt(handle, CURLOPT_USERAGENT, "moodle-tui/moot");
+    if (handle) {
+        curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
+        curl_easy_setopt(handle, CURLOPT_URL, url);
+        curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, callback);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, data);
+        curl_easy_setopt(handle, CURLOPT_USERAGENT, "moodle-tui/moot");
+    } else {
+        *error = MD_ERR_CURL_FAIL;
+    }
     return handle;
 }
 
@@ -71,9 +77,11 @@ static size_t write_stream_callback(void *contents, size_t size, size_t nmemb, v
 }
 
 void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
-    CURL *handle = createCurl(url, (void *)stream, write_stream_callback);
-    CURLcode res = curl_easy_perform(handle);
+    CURL *handle = createCurl(url, (void *)stream, write_stream_callback, error);
+    if (!handle)
+        return;
 
+    CURLcode res = curl_easy_perform(handle);
     if (res != CURLE_OK) {
         md_set_error_message(curl_easy_strerror(res));
         *error = MD_ERR_HTTP_REQUEST_FAIL;
@@ -83,103 +91,102 @@ void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
 }
 
 char *http_get_request(char *url, MDError *error) {
-    CURL *curl_handle;
+    ENSURE_EMPTY_ERROR(error);
+    CURL *handle;
     CURLcode res;
 
     struct Memblock chunk;
-    chunk.memory = (char *)malloc(1);
-    if (!chunk.memory) {
-        *error = MD_ERR_ALLOC;
-        return NULL;
-    }
     chunk.size = 0;
-
-    curl_handle = createCurl(url, (void *)&chunk, write_memblock_callback);
-    res = curl_easy_perform(curl_handle);
-
-    if (res != CURLE_OK) {
-        md_set_error_message(curl_easy_strerror(res));
-        *error = MD_ERR_HTTP_REQUEST_FAIL;
-        free(chunk.memory);
-        chunk.memory = NULL;
+    chunk.memory = (char *)md_malloc(1, error);
+    if (!*error) {
+        handle = createCurl(url, (void *)&chunk, write_memblock_callback, error);
+        if (!*error) {
+            res = curl_easy_perform(handle);
+            if (res != CURLE_OK) {
+                md_set_error_message(curl_easy_strerror(res));
+                *error = MD_ERR_HTTP_REQUEST_FAIL;
+                free(chunk.memory);
+                chunk.memory = NULL;
+            }
+            curl_easy_cleanup(handle);
+        }
     }
-    curl_easy_cleanup(curl_handle);
     return chunk.memory;
 }
 
 char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
-    CURLM *cm;
+    ENSURE_EMPTY_ERROR(error);
     CURLMsg *msg;
     unsigned int transfers = 0;
     int msgsLeft = -1;
     int stillAlive = 1;
-    
-    cm = curl_multi_init();
-    curl_multi_setopt(cm, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
 
-    // TODO
+    CURLM *multi = curl_multi_init();
+    if (!multi) {
+        *error = MD_ERR_CURL_FAIL;
+        return NULL;
+    }
+    curl_multi_setopt(multi, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
+
     struct Memblock chunks[size];
     for (int i = 0; i < size; ++i) {
+        chunks[i].memory = (char *)md_malloc(1, error);
         chunks[i].size = 0;
-        chunks[i].memory = (char *)malloc(1);
-        if (!chunks[i].memory) {
-            *error = MD_ERR_ALLOC;
-            for (int j = 0; j < i - 1; ++j)
-                free(chunks[i].memory);
-            return NULL;
-        }
         chunks[i].memory[0] = 0;
     }
-    for (transfers = 0; transfers < MAX_PARALLEL && transfers < size; transfers++)
-        curl_multi_add_handle(cm, createCurl(urls[transfers], (void *)&chunks[transfers], write_memblock_callback));
+    CURL *handles[size];
+    for (int i = 0; i < size; ++i) {
+        handles[i] = createCurl(urls[i], (void *)&chunks[i], write_memblock_callback, error);
+    }
+    if (!*error) {
+        for (transfers = 0; transfers < MAX_PARALLEL && transfers < size; transfers++)
+            curl_multi_add_handle(multi, handles[transfers]);
 
-    do {
-        curl_multi_perform(cm, &stillAlive);
+        do {
+            curl_multi_perform(multi, &stillAlive);
 
-        while ((msg = curl_multi_info_read(cm, &msgsLeft))) {
-            // TODO curl error
-            if (msg->msg = CURLMSG_DONE)
+            while ((msg = curl_multi_info_read(multi, &msgsLeft))) {
+                // TODO curl error
+                if (msg->msg != CURLMSG_DONE) {
+                    md_set_error_message(curl_easy_strerror(msg->data.result));
+                    *error = MD_ERR_HTTP_REQUEST_FAIL;
+                }
+                curl_multi_remove_handle(multi, msg->easy_handle);
                 curl_easy_cleanup(msg->easy_handle);
-            else {
-                md_set_error_message(curl_easy_strerror(msg->data.result));
-                *error = MD_ERR_HTTP_REQUEST_FAIL;
+
+                if (transfers < size)
+                    curl_multi_add_handle(multi, handles[transfers]);
             }
+            if (stillAlive)
+                curl_multi_wait(multi, NULL, 0, 500, NULL);
 
-            if (transfers < size)
-                curl_multi_add_handle(cm,
-                                      createCurl(urls[transfers], (void *)&chunks[transfers], write_memblock_callback));
-        }
-        if (stillAlive)
-            curl_multi_wait(cm, NULL, 0, 500, NULL);
+        } while (stillAlive || (transfers < size));
 
-    } while (stillAlive || (transfers < size));
+        curl_multi_cleanup(multi);
+    }
 
-    curl_multi_cleanup(cm);
-    char **result = malloc(size * sizeof(char *));
-    if (result) {
-        for (int i = 0; i < size; ++i)
+    char **result = md_malloc(size * sizeof(char *), error);
+    if (!*error) {
+        for (int i = 0; i < size; ++i) {
             result[i] = chunks[i].memory;
+        }
     } else {
         for (int i = 0; i < size; ++i) {
             free(chunks[i].memory);
         }
-        *error = MD_ERR_ALLOC;
+        free(result);
+        result = NULL;
     }
     return result;
 }
 
-char *http_post_file(const char *url, const char *filename, const char *name, MDError *error) {
+char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error) {
+    ENSURE_EMPTY_ERROR(error);
     struct Memblock chunk;
     chunk.size = 0;
-    chunk.memory = (char *)malloc(1);
-    if (!chunk.memory) {
-        *error = MD_ERR_ALLOC;
-        return NULL;
-    }
-    int fail = 0;
-    CURL *handle = createCurl(url, &chunk.memory, write_memblock_callback);
-
-    if (handle) {
+    chunk.memory = (char *)md_malloc(1, error);
+    CURL *handle = createCurl(url, &chunk, write_memblock_callback, error);
+    if (!*error) {
         curl_mime *mime;
         curl_mimepart *part;
 
@@ -196,31 +203,22 @@ char *http_post_file(const char *url, const char *filename, const char *name, MD
             if (response != CURLE_OK) {
                 md_set_error_message(curl_easy_strerror(response));
                 *error = MD_ERR_HTTP_REQUEST_FAIL;
-                fail = 1;
             }
         } else {
             *error = MD_ERR_FILE_OPERATION;
             md_set_error_message(filename);
-            fail = 1;
         }
         curl_easy_cleanup(handle);
         curl_mime_free(mime);
-
-    } else {
-        *error = MD_ERR_CURL_FAIL;
-        fail = 1;
     }
-
-    if (fail) {
+    if (*error) {
         free(chunk.memory);
         chunk.memory = NULL;
     }
-
     return chunk.memory;
 }
 
-
-json_value *json_get_property_silent(json_value *json, const char *key) {
+json_value *json_get_property_silent(json_value *json, cchar *key) {
     if (json->type != json_object)
         return NULL;
     for (int i = 0; i < json->u.object.length; ++i) {
@@ -231,7 +229,7 @@ json_value *json_get_property_silent(json_value *json, const char *key) {
     return NULL;
 }
 
-json_value *json_get_property(json_value *json, const char *key, json_type type, MDError *error) {
+json_value *json_get_property(json_value *json, cchar *key, json_type type, MDError *error) {
     json_value *value = json_get_property_silent(json, key);
     if (value) {
         if (value->type != type) {
@@ -245,21 +243,21 @@ json_value *json_get_property(json_value *json, const char *key, json_type type,
     return value;
 }
 
-long json_get_integer(json_value *json, const char *key, MDError *error) {
+long json_get_integer(json_value *json, cchar *key, MDError *error) {
     json_value *value = json_get_property(json, key, json_integer, error);
     if (value)
         return value->u.integer;
     return 0;
 }
 
-int json_get_bool(json_value *json, const char *key, MDError *error) {
+int json_get_bool(json_value *json, cchar *key, MDError *error) {
     json_value *value = json_get_property(json, key, json_boolean, error);
     if (value)
         return value->u.boolean;
     return 0;
 }
 
-char *json_get_string(json_value *json, const char *key, MDError *error) {
+char *json_get_string(json_value *json, cchar *key, MDError *error) {
     MDError prev = *error;
     json_value *value = json_get_property(json, key, json_string, error);
     if (*error == MD_ERR_INVALID_JSON_VALUE) {
@@ -270,17 +268,17 @@ char *json_get_string(json_value *json, const char *key, MDError *error) {
         }
     }
     if (value)
-        return clone_str_error(value->u.string.ptr, error);
+        return clone_str(value->u.string.ptr, error);
     return NULL;
 }
 
-const char *json_get_string_no_alloc(json_value *json, const char *key, MDError *error) {
+cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error) {
     json_value *value = json_get_property(json, key, json_string, error);
     if (value)
         return value->u.string.ptr;
     return NULL;
 }
 
-json_value *json_get_array(json_value *json, const char *key, MDError *error) {
+json_value *json_get_array(json_value *json, cchar *key, MDError *error) {
     return json_get_property(json, key, json_array, error);
 }
