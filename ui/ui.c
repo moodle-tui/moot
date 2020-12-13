@@ -9,9 +9,13 @@
 #include "moodle.h"
 // #include "util.h"
 
+#define EMPTY_OPTIONS_NAME "[empty]"
+#define OPTION_CUT_STR "~"
+#define SEPERATOR "  "
+
 typedef struct menuInfo {
     int depth, *widths, HLOptions[3];
-    char *seperator;
+    _Bool canGoRight;
 } MenuInfo;
 
 /* Reads single line up to n bytes from file with \n removed. s should be at
@@ -33,9 +37,12 @@ int fread_line(FILE *file, char *s, int n) {
 }
 
 void printErr(char *msg) {
-    cls();
     showcursor();
+    locate(0, 0);
+    saveDefaultColor();
+    setBackgroundColor(4);
     printf("Error: %s\n", msg);
+    resetColor();
     getch();
 }
 
@@ -52,6 +59,33 @@ void printSpaces(int count) {
     printf("%*s", count, "");
 }
 
+char *getNextHighlightedOption(MDArray courses, MenuInfo *menuInfo) {
+    MDArray topics = MD_COURSES(courses)[menuInfo->HLOptions[0]].topics;
+    MDArray modules = MD_TOPICS(topics)[menuInfo->HLOptions[1]].modules;
+    char *name = "";
+    
+    switch (menuInfo->depth) {
+    case 0:
+        if (topics.len != 0)
+            name = MD_TOPICS(topics)[0].name;
+        else
+            name = NULL;
+        break;
+    case 1:
+        if(modules.len != 0)
+            name = MD_MODULES(modules)[0].name;
+        else
+            name = NULL;
+    }
+    return name;
+}
+
+_Bool checkIfRightActionPossible(MDArray courses, MenuInfo *menuInfo) {
+    if (getNextHighlightedOption(courses, menuInfo) != NULL)
+        return 1;
+
+    return 0;
+}
 
 int goLeft(MenuInfo *menuInfo) {
     if (menuInfo->depth != 0) {
@@ -85,42 +119,45 @@ void goUp(int *highlightedOption, int nrOfOptions) {
 }
 
 // returns 0 on succes, -1 on invalid action, 1 on quit
-int processNavigationRequest(MenuInfo *menuInfo, int nrOfOptions) {
+int processNavigationRequest(MenuInfo *menuInfo, int nrOfOptions, _Bool canGoRight) {
     int key = getkey();
     int returnCode = 0;
     int *highlightedOption = &menuInfo->HLOptions[menuInfo->depth];
     switch (key) {
-        case 106: // j
-        case KEY_DOWN:
-            goDown(highlightedOption, nrOfOptions);
-            break;
-        case 107: // k
-        case KEY_UP:
-            goUp(highlightedOption, nrOfOptions);
-            break;
-        case 0:
-            if (getkey() == 91) {
-                key = getkey();
-                switch (key) {
-                    case 66: // arrow down
-                        goDown(highlightedOption, nrOfOptions);
-                        break;
-                    case 65: // arrow up
-                        goUp(highlightedOption, nrOfOptions);
-                }
+    case 106: // j
+    case KEY_DOWN:
+        goDown(highlightedOption, nrOfOptions);
+        break;
+    case 107: // k
+    case KEY_UP:
+        goUp(highlightedOption, nrOfOptions);
+        break;
+    case 0:
+        if (getkey() == 91) {
+            key = getkey();
+            switch (key) {
+            case 66: // arrow down
+                goDown(highlightedOption, nrOfOptions);
+                break;
+            case 65: // arrow up
+                goUp(highlightedOption, nrOfOptions);
             }
-            break;
-        case 104: // h
-        case KEY_LEFT:
-            returnCode = goLeft(menuInfo);
-            break;
-        case 108: // l
-        case KEY_RIGHT:
-        case 10: // enter
+        }
+        break;
+    case 104: // h
+    case KEY_LEFT:
+        returnCode = goLeft(menuInfo);
+        break;
+    case 108: // l
+    case KEY_RIGHT:
+    case 10: // enter
+        if (canGoRight)
             returnCode = goRight(menuInfo);
-            break;
-        case 113: // q
-            returnCode = 1;
+        else
+            returnCode = -1;
+        break;
+    case 113: // q
+        returnCode = 1;
     }
     return returnCode;
 }
@@ -135,19 +172,20 @@ void printOption(char *optionName, int width) {
     while (1) {
         int charSize = utf8decode(optionName + printedChSize, &u, optionLength);
         int charWidth = wcwidth(u);
-        printedChWidth += charWidth;
 
-        if (printedChWidth > width - 1 && optionName[printedChSize + charSize]) {
-            printf("~");
-            printSpaces(printedChWidth - width);
+        if (!optionName[printedChSize]) {
+            printSpaces(width - printedChWidth);
             break;
         }
-        if (charWidth == 0) {
-            printSpaces(width - printedChWidth);
+        else if (printedChWidth + charWidth > width - 1 && optionName[printedChSize + charSize]) {
+            printSpaces(width - printedChWidth - 1);
+            printf("~");
+            ++printedChWidth;
             break;
         }
 
         fwrite(optionName + printedChSize, charWidth, charSize, stdout);
+        printedChWidth += charWidth;
         printedChSize += charSize;
     }
 
@@ -167,42 +205,51 @@ void addOption(char *name, MenuInfo *menuInfo, int optionDepth, _Bool isHighligh
         return;
 
     if (widthIndex == 1 || widthIndex == 2)
-        printf("%s", menuInfo->seperator);
+        printf("%s", SEPERATOR);
 
     if (name == NULL) {
         printErr("Invalid option name. Expected string, got NULL");
     }
-    if (isHighlighted)
+    if (isHighlighted && strcmp(name, EMPTY_OPTIONS_NAME))
         printHighlightedOption(name, menuInfo->widths[widthIndex]);
     else
         printOption(name, menuInfo->widths[widthIndex]);
 }
 
-void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int optionDepth) {
-    if (mdArray.len > heightIndex) {
-        switch (optionDepth) {
-            case 0:
-                addOption(MD_COURSES(mdArray)[heightIndex].name,
-                            menuInfo, optionDepth,
-                            menuInfo->HLOptions[optionDepth] == heightIndex);
-                break;
-            case 1:
-                addOption(MD_TOPICS(mdArray)[heightIndex].name,
-                            menuInfo, optionDepth,
-                            menuInfo->HLOptions[optionDepth] == heightIndex);
-                break;
-            case 2:
-                addOption(MD_MODULES(mdArray)[heightIndex].name,
-                            menuInfo, optionDepth,
-                            menuInfo->HLOptions[optionDepth] == heightIndex);
-                break;
-            default:
-                printf("Wrong option index\n");
-        }
+char *getMDArrayName(MDArray mdArray, int heightIndex, int depthIndex) {
+    char *name;
+    switch (depthIndex) {
+    case 0:
+        name = MD_COURSES(mdArray)[heightIndex].name;
+        break;
+    case 1:
+        name = MD_TOPICS(mdArray)[heightIndex].name;
+        break;
+    case 2:
+        name = MD_MODULES(mdArray)[heightIndex].name;
+        break;
+    default:
+        printErr("Wrong option index\n");
     }
-    else
-        addOption(" ", menuInfo, optionDepth,
-                  menuInfo->HLOptions[optionDepth] == heightIndex);
+    return name;
+}
+
+void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int depthIndex) {
+    char *name;
+    if (mdArray.len > heightIndex) {
+        name = getMDArrayName(mdArray, heightIndex, depthIndex);
+    }
+    else {
+        if (heightIndex == 0)
+            name = EMPTY_OPTIONS_NAME;
+        else if (depthIndex == 2)
+            return;
+        else
+            name = " ";
+    }
+
+    addOption(name, menuInfo, depthIndex,
+              menuInfo->HLOptions[depthIndex] == heightIndex);
 }
 
 void printMenu(MDArray courses, MenuInfo *menuInfo, int height) {
@@ -239,7 +286,7 @@ void menuLoop (MDArray courses, MenuInfo *menuInfo) {
     _Bool isOptionChosen = 0;
 
     while (!isOptionChosen) {
-        menuInfo->widths = getWidthsOfOptions(strlen(menuInfo->seperator));
+        menuInfo->widths = getWidthsOfOptions(strlen(SEPERATOR));
         int *heights = getHeights(courses, menuInfo->HLOptions);
         int maxHeight = getMax(heights, 3);
         int availableHeight = trows() - 1;
@@ -250,8 +297,10 @@ void menuLoop (MDArray courses, MenuInfo *menuInfo) {
         printMenu(courses, menuInfo, maxHeight);
 
         int navReturnCode;
+        _Bool canGoRight = checkIfRightActionPossible(courses, menuInfo);
         do {
-            navReturnCode = processNavigationRequest(menuInfo, heights[menuInfo->depth]);
+            navReturnCode = processNavigationRequest(menuInfo, heights[menuInfo->depth],
+                                                     canGoRight);
         } while (navReturnCode == -1);
 
         if (navReturnCode == 1)
@@ -278,7 +327,6 @@ int main () {
     MenuInfo menuInfo = {
         .HLOptions = {0},
         .depth = 0,
-        .seperator = "  "
     };
     hidecursor();
     menuLoop(mdArray, &menuInfo);
