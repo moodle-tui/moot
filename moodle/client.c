@@ -412,10 +412,12 @@ void md_load_courses_topics(MDClient *client, MDArray courses, MDError *error) {
 }
 
 void md_client_cleanup(MDClient *client) {
-    free(client->token);
-    free(client->website);
-    free(client->fullName);
-    free(client->siteName);
+    if (client) {
+        free(client->token);
+        free(client->website);
+        free(client->fullName);
+        free(client->siteName);
+    }
     free(client);
 }
 
@@ -536,13 +538,14 @@ void md_client_mod_workshop_submit(MDClient *client,
     json_value_free(json);
 }
 
-MDModule *md_locate_courses_module(MDCourse course, int instance, MDError *error) {
+MDModule *md_locate_courses_module(MDCourse course, int instance, int id, MDError *error) {
     // TODO: optimize for log n lookup
     for (int i = 0; i < course.topics.len; ++i) {
         MDTopic topic = MD_ARR(course.topics, MDTopic)[i];
         for (int j = 0; j < topic.modules.len; ++j) {
-            if (MD_ARR(topic.modules, MDModule)[j].instance == instance) {
-                return &MD_ARR(topic.modules, MDModule)[j];
+            MDModule *module = &MD_ARR(topic.modules, MDModule)[j];
+            if (module->instance == instance && module->id == id) {
+                return module;
             }
         }
     }
@@ -618,9 +621,10 @@ void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses
             for (int j = 0; j < jsonAssignments->u.array.length && (!*error); ++j) {
                 json_value *jsonAssignment = jsonAssignments->u.array.values[j];
                 int instance = json_get_integer(jsonAssignment, "id", error);
+                int moduleId = json_get_integer(jsonAssignment, "cmid", error);
                 if (*error)
                     break;
-                MDModule *module = md_locate_courses_module(course, instance, error);
+                MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
                 if (*error)
                     break;
                 module->type = MD_MOD_ASSIGNMENT;
@@ -667,9 +671,10 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             MDCourse course = MD_ARR(courses, MDCourse)[index];
 
             int instance = json_get_integer(jsonWorkshop, "id", error);
+            int moduleId = json_get_integer(jsonWorkshop, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, error);
+            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_WORKSHOP;
@@ -720,18 +725,19 @@ void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, 
             MDCourse course = MD_ARR(courses, MDCourse)[index];
 
             int instance = json_get_integer(jsonResource, "id", error);
+            int moduleId = json_get_integer(jsonResource, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, error);
+            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_RESOURCE;
             MDModResource *resource = &module->contents.resource;
             resource->description.text = json_get_string(jsonResource, "intro", error);
             resource->description.format = json_get_integer(jsonResource, "introformat", error);
-            json_value *jsonAttachments = json_get_array(jsonResource, "contentfiles", error);
-            if (jsonAttachments)
-                resource->files = md_parse_files(jsonAttachments, error);
+            json_value *jsonFiles = json_get_array(jsonResource, "contentfiles", error);
+            if (jsonFiles)
+                resource->files = md_parse_files(jsonFiles, error);
         }
     }
     json_value_free(json);
@@ -762,9 +768,10 @@ void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, char 
             MDCourse course = MD_ARR(courses, MDCourse)[index];
 
             int instance = json_get_integer(jsonUrl, "id", error);
+            int moduleId = json_get_integer(jsonUrl, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, error);
+            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_URL;

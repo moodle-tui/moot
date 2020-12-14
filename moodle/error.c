@@ -25,7 +25,7 @@ struct errorMsg {
     {MD_ERR_HTTP_REQUEST_FAIL, "Http request failed: %s"},
     {MD_ERR_CURL_FAIL, "Curl library error"},
     {MD_ERR_FILE_OPERATION, "Unable to perform operation on file %s"},
-    {MD_ERR_MISUSED_MOODLE_API, "Moodle api c function was used incorretly"},
+    {MD_ERR_MISUSED_MOODLE_API, "Moodle api c function was used incorrectly"},
     {MD_ERR_MISMACHING_MOODLE_DATA, "Moodle server returned different data from different calls"},
 };
 

@@ -2,6 +2,7 @@
 .token
 .vscode
 moodle/test/test
+moot
 
 # Prerequisites
 *.d

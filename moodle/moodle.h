@@ -1,14 +1,39 @@
 #ifndef __MOODLE_H
 #define __MOODLE_H
 
+/*
+ * Copyright (C) 2020 Nojus Gudinavičius
+ * nojus.gudinavicius@gmail.com
+ * https://github.com/moodle-tui/moot
+ * 
+ * Moodle SDK
+ * This is a heavily simplified and minimized Moodle SDK interacting through
+ * Moodle webservice api. Built for and tested with moodle 3.1.
+ * https://docs.moodle.org/310/en/Web_services
+ *
+*/
+
+
 #include <time.h>
 #include "stdbool.h"
 
-// MDArray is generic array. When accessing elements, it should be casted using macro MD_ARR;
-// E. g.: Array numbers = MD_MAKE_ARR(int, 1, 2, 3); MD_ARR(numbers, int)[0] == 1;
-// MDArray may be created by client using macros MD_MAKE_ARR and MD_MAKE_ARR_LEN. Arrays from
-// these macros can be used to pass values to moodle functions, but may not be returned
-// from a function or be cleaned up, as these arrays are tied to the current scope.
+#define DEBUG(var) \
+    printf("DBG: %s = ", #var); \
+    printf(_Generic( \
+        var, \
+        int: "%d", \
+        char *: "%s", \
+        const char *: "%s", \
+        default: "?" \
+    ), var); \
+    printf("\n"); \
+
+// MDArray is generic array. When accessing elements, it should be casted using
+// macro MD_ARR; E. g.: Array numbers = MD_MAKE_ARR(int, 1, 2, 3);
+// MD_ARR(numbers, int)[0] == 1; MDArray may be created by client using macros
+// MD_MAKE_ARR and MD_MAKE_ARR_LEN. Arrays from these macros can be used to pass
+// values to moodle functions, but may not be returned from a function or be
+// cleaned up, as these arrays are tied to the current scope.
 typedef struct MDArray {
     int len;
     void *_data;
@@ -51,8 +76,9 @@ typedef struct MDClient {
     char *token, *website;  // private
 } MDClient;
 
-// MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely never be returned,
-// as unsuported modules are simply skipped when fetching courses.
+// MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely
+// never be returned, as unsuported modules are simply skipped when fetching
+// courses.
 typedef enum MDModType {
     MD_MOD_UNSUPPORTED,
     MD_MOD_ASSIGNMENT = 1,
