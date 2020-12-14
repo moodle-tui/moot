@@ -88,8 +88,8 @@ MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
             for (int i = 0; i < courses.len && !*error; ++i) {
                 json_value *course = jsonCourses->u.array.values[i];
                 cchar *format = json_get_string_no_alloc(course, "format", error);
-                // only topics format courses are supported
-                if (format && strcmp(format, "topics") != 0) {
+                // only topics or weeks format courses are supported
+                if (format && strcmp(format, "topics") && strcmp(format, "weeks")) {
                     ++skip;
                     continue;
                 }
@@ -501,8 +501,8 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
                                                       "&plugindata[files_filemanager]=%ld"
                                                       "&plugindata[onlinetext_editor][text]="
                                                       "&plugindata[onlinetext_editor][format]=4"
-                                                      "&plugindata[onlinetext_editor][itemid]=%ld",
-                                                      assignment->instance, itemId, itemId);
+                                                      "&plugindata[onlinetext_editor][itemid]=0",
+                                                      assignment->instance, itemId);
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
         if (message) {
@@ -522,12 +522,15 @@ void md_client_mod_workshop_submit(MDClient *client,
     long itemId = md_client_upload_files(client, filenames, error);
     if (*error)
         return;
-
+    char content[2] = {0, 0};
+    if (workshop->contents.workshop.textSubmissionRequired)
+        content[0] = '-';
     json_value *json = md_client_do_http_json_request(client, error, "mod_workshop_add_submission",
                                                       "&workshopid=%d"
                                                       "&title=%s"
+                                                      "&content=%s"
                                                       "&attachmentsid=%ld",
-                                                      workshop->instance, title, itemId);
+                                                      workshop->instance, title, content, itemId);
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
         if (message) {
@@ -684,6 +687,7 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             workshop->description.format = json_get_integer(jsonWorkshop, "introformat", error);
             workshop->instructions.text = json_get_string(jsonWorkshop, "instructauthors", error);
             workshop->instructions.format = json_get_integer(jsonWorkshop, "instructauthorsformat", error);
+            workshop->textSubmissionRequired = json_get_integer(jsonWorkshop, "submissiontypetext", error);
             workshop->fileSubmission.status = json_get_integer(jsonWorkshop, "submissiontypefile", error);
             if (workshop->fileSubmission.status != MD_SUBMISSION_DISABLED) {
                 workshop->fileSubmission.acceptedFileTypes =

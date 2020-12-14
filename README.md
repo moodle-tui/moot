@@ -8,8 +8,8 @@ Moot (Moodle TUI) is a terminal interface application for interacting with [Mood
 
 ## Features
 As of now, the functionality is focused for students to upload their assignments
-and download files from the server. Currently only `topics` format courses are
-supported. At least partially supported modules:
+and download files from the server. Currently only `topics` and `weeks` format
+courses are supported. At least partially supported modules:
  - `Assignment` - description, attached files and file submission.
  - `Workshop` - description and file submission.
  - `Resource` - description and attached files.
