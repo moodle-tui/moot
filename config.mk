@@ -4,5 +4,5 @@ TARGET = moot
 CCFLAGS = -Wall -g
 # e. g. -I.../curl/include
 INCLUDES =
-# e. g. -I.../curl/lib
+# e. g. -L.../curl/lib
 LIBS = 
