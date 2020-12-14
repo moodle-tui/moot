@@ -131,6 +131,20 @@ typedef struct MDFileSubmission {
     char *acceptedFileTypes;  // may be NULL if file types are not limited.
 } MDFileSubmission;
 
+typedef enum MDModAssignmentStatus {
+    MD_MOD_ASSIGNMENT_STATUS_NEW,
+    MD_MOD_ASSIGNMENT_STATUS_SUBMITTED,
+} MDModAssignmentStatus;
+
+typedef struct MDModAssignmentState {
+    MDModAssignmentStatus status;
+    
+} MDModAssignmentState;
+
+typedef struct MDModWorkshopState {
+
+} MDModWorkshopState;
+
 // MDModAssignment represents moodle assignment. Currently it only supports file submission, which
 // may be disabled.
 typedef struct MDModAssignment {
@@ -216,6 +230,11 @@ typedef enum MDError {
     MD_ERR_MISUSED_MOODLE_API,
     MD_ERR_MISMACHING_MOODLE_DATA,
 } MDError;
+
+typedef MDArray MDFetchedStatus;
+
+MDFetchedStatus md_courses_fetch_status(MDClient *client, MDArray courses, MDError *error);
+void md_fetched_status_apply(MDFetchedStatus status);
 
 // md_error_get_message returns the error message for an error;
 const char *md_error_get_message(MDError error);

@@ -86,6 +86,17 @@ json_value *json_get_array(json_value *json, cchar *key, MDError *error);
 // client.c
 
 typedef void (*MDParseFunc)(MDClient *client, MDArray courses, json_value *json, MDError *error);
+struct MDStateRef {
+    MDModule *module;
+    union {
+        MDModWorkshopState workshop;
+        MDModAssignmentState assignment;
+    } state;
+};
+
+typedef struct MDState {
+    
+} MDState;
 
 // MDInitFunc is the callback called by md_array_init_new for each created element.
 typedef void (*MDInitFunc)(void *);
