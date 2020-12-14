@@ -34,6 +34,7 @@ int main() {
     char* token = get_token(&error);
     if (error)
         goto end;
+
     println("Creating client");
     MDClient* client = md_client_new(token, "https://school.moodledemo.net", &error);
     if (error)
@@ -44,11 +45,10 @@ int main() {
     if (error)
         goto end;
 
-    println("Acceptint policy");
-    md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", "");
+    println("Accepting policy");
+    json_value_free(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
     if (error)
         goto end;
-
 
     println("Client information:");
     println("Site: %s", client->siteName);
@@ -66,17 +66,19 @@ int main() {
     for (int i = 0; i < courses.len; ++i) {
         MDCourse *course = &MD_COURSES(courses)[i];
         teststr(course->name);
+        println("%s", course->name);
         for (int j = 0; j < course->topics.len; ++j) {
             MDTopic *topic = &MD_TOPICS(course->topics)[j];
+            println(" - %s", topic->name);
             teststr(topic->name);
             teststr(topic->summary.text);
             for (int k = 0; k < topic->modules.len; ++k) {
                 MDModule *module = &MD_MODULES(topic->modules)[k];
+                println("    - %s", module->name);
                 teststr(module->name);
                 switch (module->type)
                 {
                 case MD_MOD_ASSIGNMENT:
-                    println("%s %d %d", course->name, course->id, module->instance);
                     teststr(module->contents.assignment.description.text);
                     for (int l = 0; l < module->contents.assignment.files.len; ++l) {
                         teststr(MD_FILES(module->contents.assignment.files)[l].filename);
@@ -108,74 +110,14 @@ int main() {
             
         }
     }
-
-    // md_client_init(client, &err);
 end:
     if (error)
         printf("Error: %s\n", md_error_get_message(error));
     else 
         println("Done");
     free(token);
+    md_client_cleanup(client);
+    md_courses_cleanup(courses);
     curl_global_cleanup();
     return 0;
-    // test_upload();
-
-    // curl_global_cleanup();
-    // return 0;
-
-    // MDError err = MD_ERR_NONE;
-    // FILE* f = fopen(".token", "r");
-    // char token[100];
-    // fread_line(f, token, 99);
-    // MDClient* client = md_client_new(token, "https://emokymai.vu.lt", &err);
-    // md_client_init(client, &err);
-    // if (!err) {
-    //     printf("Site: %s\nName: %s\n", client->siteName, client->fullName);
-    //     printf("%d\n", err);
-    //     // return 0;
-    // } else {
-    //     printf("%d %s\n", err, md_error_get_message(err));
-    //     return 0;
-    // }
-    // MDArray courseArr = md_client_fetch_courses(client, &err);
-    // MDCourse* courses = MD_ARR(courseArr, MDCourse);
-
-    // printf("%d\n", err);
-    // if (!err) {
-    //     for (int i = 0; i < courseArr.len; ++i) {
-    //         printf("%s %d\n", courses[i].name, courses[i].id);
-    //         for (int j = 0; j < courses[i].topics.len; ++j) {
-    //             MDArray modules = MD_TOPICS(courses[i].topics)[j].modules;
-    //             printf(" - %s\n", MD_TOPICS(courses[i].topics)[j].name);
-    //             for (int k = 0; k < modules.len; ++k) {
-    //                 printf("  - %s\n", MD_MODULES(modules)[k].name);
-    //                 if (MD_MODULES(modules)[k].type == MD_MOD_RESOURCE) {
-    //                     for (int a = 0; a < MD_MODULES(modules)[k].contents.resource.files.len; ++a) {
-    //                         printf("[%s]\n", MD_FILES(MD_MODULES(modules)[k].contents.resource.files)[a].filename);
-    //                         FILE* f = fopen(MD_FILES(MD_MODULES(modules)[k].contents.resource.files)[a].filename,
-    //                         "w"); if (!f)
-    //                             perror("noppe");
-    //                         md_client_download_file(
-    //                             client, &MD_ARR(MD_ARR(modules, MDModule)[k].contents.resource.files, MDFile)[a], f,
-    //                             &err);
-    //                         fclose(f);
-    //                         return 0;
-    //                     }
-
-    //                     // printf("[%s]\n", modules.data[k].contents.assignment.description.text);
-    //                     // printf("[%s]\n", modules.data[k].contents.workshop.description.text);
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    // } else {
-    //     printf("%s\n", md_error_get_message(err));
-    // }
-    // // return 0;
-    // md_courses_cleanup(courseArr);
-
-    // md_client_cleanup(client);
-    // fclose(f);
-    // curl_global_cleanup();
 }

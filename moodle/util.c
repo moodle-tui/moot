@@ -5,21 +5,10 @@
 #include <string.h>
 #include "internal.h"
 #include "json.h"
-#define MAX_PARALLEL 20
+#define CURL_MAX_PARALLEL 20
 
-// struct to temporarily hold data while performing http request.
-struct Memblock;
-
-// CURL callback to write data to Memblock;
 static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp);
 
-struct Memblock {
-    char *memory;
-    size_t size;
-    MDError *error;
-};
-
-// CURL callback to write data to Memblock;
 static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     struct Memblock *mem = (struct Memblock *)userp;
@@ -126,7 +115,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
         *error = MD_ERR_CURL_FAIL;
         return NULL;
     }
-    curl_multi_setopt(multi, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
+    curl_multi_setopt(multi, CURLMOPT_MAXCONNECTS, (long)CURL_MAX_PARALLEL);
 
     struct Memblock chunks[size];
     for (int i = 0; i < size; ++i) {
@@ -139,7 +128,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
         handles[i] = createCurl(urls[i], (void *)&chunks[i], write_memblock_callback, error);
     }
     if (!*error) {
-        for (transfers = 0; transfers < MAX_PARALLEL && transfers < size; transfers++)
+        for (transfers = 0; transfers < CURL_MAX_PARALLEL && transfers < size; transfers++)
             curl_multi_add_handle(multi, handles[transfers]);
 
         do {

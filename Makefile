@@ -41,9 +41,10 @@ test: $(MOODLE_OBJ) $(LIB_OBJ)
 	$(CC) $(CCFLAGS) $(TEST).c $^ $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(TEST)
 
 clean:
-	rm -f $(LIB_OBJ)
-	rm -f $(MOODLE_OBJ)
-	rm -f $(UI_OBJ)
-	rm -f $(TARGET)
+	$(RM) $(LIB_OBJ)
+	$(RM) $(MOODLE_OBJ)
+	$(RM) $(UI_OBJ)
+	$(RM) $(TARGET)
+	$(RM) $(TEST)
 
 .PHONY: all $(LIB) $(MOODLE) moot clean test

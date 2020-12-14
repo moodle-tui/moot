@@ -1,5 +1,5 @@
-MAKE = make
 CC = gcc
+RM = rm -f
 TARGET = moot
 CCFLAGS = -Wall -g
 # e. g. -I.../curl/include
