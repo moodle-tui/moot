@@ -22,6 +22,7 @@
     printf(_Generic( \
         var, \
         int: "%d", \
+        long: "%ld", \
         char *: "%s", \
         const char *: "%s", \
         default: "?" \

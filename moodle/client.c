@@ -35,6 +35,8 @@ json_value *md_client_do_http_json_request(MDClient *client, MDError *error, cha
     va_end(args);
 
     char *data = http_get_request(url, error);
+    DEBUG(data);
+    DEBUG(url);
     if (!data)
         return NULL;
     json_value *json = md_parse_moodle_json(data, error);
@@ -443,10 +445,11 @@ long md_client_upload_file(MDClient *client, cchar *filename, long itemId, MDErr
     long resultId = 0;
     sprintf(url,
             "%s%s"
-            "?token=%s"
-            "&itemid=%ld",
+            "?token=%s",
+            // "&itemid=%ld",
             client->website, MD_UPLOAD_URL, client->token, itemId);
-    char *data = http_post_file(url, filename, "file_box", error);
+    char *data = http_post_file(url, filename, "file-box", error);
+    DEBUG(data);
     if (!*error) {
         json_value *json = md_parse_moodle_json(data, error);
         if (!*error) {
@@ -498,10 +501,10 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
     // ignore submit text and comments for now.
     json_value *json = md_client_do_http_json_request(client, error, "mod_assign_save_submission",
                                                       "&assignmentid=%d"
-                                                      "&plugindata[files_filemanager]=%ld"
-                                                      "&plugindata[onlinetext_editor][text]="
-                                                      "&plugindata[onlinetext_editor][format]=4"
-                                                      "&plugindata[onlinetext_editor][itemid]=%ld",
+                                                      "&plugindata[onlinetext_editor][text]=txt"
+                                                      "&plugindata[onlinetext_editor][format]=1"
+                                                      "&plugindata[onlinetext_editor][itemid]=%ld"
+                                                      "&plugindata[files_filemanager]=%ld",
                                                       assignment->instance, itemId, itemId);
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);

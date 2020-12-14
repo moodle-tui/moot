@@ -28,6 +28,14 @@ char* get_token(MDError* error) {
     return token;
 }
 
+MDModule *locate_module(MDArray courses, int courseId, int moduleId, int instance, MDError * error) {
+    for (int i = 0; i < courses.len; ++i) {
+        if (MD_COURSES(courses)[i].id == courseId)
+            return md_course_locate_module(MD_COURSES(courses)[i], instance, moduleId, error);
+    }
+    return NULL;
+}
+
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
     MDError error = MD_ERR_NONE;
@@ -62,6 +70,14 @@ int main() {
     if (error)
         goto end;
     
+    println("Checking specific modules");
+    MDModule *assignment = locate_module(courses, 66, 788, 119, &error);
+    if (error)
+        goto end;
+    assertend(assignment && assignment->type == MD_MOD_ASSIGNMENT);
+    assertend(strcmp(assignment->name, "Assignment 2 (Upload)") == 0);
+
+
     println("Validating data");
     for (int i = 0; i < courses.len; ++i) {
         MDCourse *course = &MD_COURSES(courses)[i];
@@ -74,7 +90,7 @@ int main() {
             teststr(topic->summary.text);
             for (int k = 0; k < topic->modules.len; ++k) {
                 MDModule *module = &MD_MODULES(topic->modules)[k];
-                println("    - %s", module->name);
+                println("    - %s %d", module->name, module->instance);
                 teststr(module->name);
                 switch (module->type)
                 {
@@ -110,6 +126,12 @@ int main() {
             
         }
     }
+
+    println("Testing module assignment submission");
+    md_client_mod_assign_submit(client, assignment, MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), &error);
+    if (error)
+        goto end;
+    println("Check for success on https://school.moodledemo.net/mod/assign/view.php?id=%d", assignment->id);
 end:
     if (error)
         printf("Error: %s\n", md_error_get_message(error));
