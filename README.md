@@ -42,12 +42,12 @@ personal token:
    actually need.
 
 ### Interface
-To use the app, you simply need to run the executable. 
+To use the app put token in `.token` file in executable directory, and run the executable. 
 You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
 where the middle column is the current column you are navigating in.
 
 ### Keys
-Theys are keys and actions, that moot interface currently supports. more comming soon.
+Theys are keys and actions, that moot interface currently supports. More comming soon.
 - To move around, us the arrow keys or vim equivalents (`h`, `j`, `k`, `l`).
 - To quit, press `q`.
 - To download a file simply hover it and press enter or right arrow key. It will be downloaded to the location of the executable.
