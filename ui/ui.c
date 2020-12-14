@@ -13,7 +13,7 @@
 int main () {
     curl_global_init(CURL_GLOBAL_ALL);
 
-    FILE *f = fopen("../.token", "r");
+    FILE *f = fopen(".token", "r");
     char token[100];
     fread_line(f, token, 99);
     MDError err;
@@ -67,9 +67,6 @@ void mainLoop (MDArray courses, MenuInfo *menuInfo) {
         cls();
         menuInfo->currentMaxDepth = 0;
         printMenu(courses, menuInfo, maxHeight);
-        //char msg[20];
-        //sprintf(msg, "max depth: %d\n", menuInfo->maxDepth);
-        //printErr(msg);
 
         Action action;
         do {

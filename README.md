@@ -18,6 +18,7 @@ supported. At least partially supported modules:
 ## Usage
 
 ### Authentication
+
 To use the tool you will need to acquire your personal Moodle token. This can
 only be done if the Moodle site has enabled the [mobile
 app](https://github.com/moodlehq/moodleapp). There are two ways to get your
@@ -42,6 +43,14 @@ personal token:
 
 ### Interface
 To use the app, you simply need to run the executable. 
+You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
+where the middle column is the current column you are navigating in.
+
+### Keys
+Theys are keys and actions, that moot interface currently supports. more comming soon.
+- To move around, us the arrow keys or vim equivalents (`h`, `j`, `k`, `l`).
+- To quit, press `q`.
+- To download a file simply hover it and press enter or right arrow key. It will be downloaded to the location of the executable.
 
 ## Installing
 Currently we don't provide any prebuilt binaries, so one has to build for himself and put the final executable in [path](https://en.wikipedia.org/wiki/PATH_(variable))
