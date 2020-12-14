@@ -6,7 +6,7 @@ Moot (Moodle TUI) is a terminal interface application for interacting with [Mood
 
 ---
 
-### Features
+## Features
 As of now, the functionality is focused for students to upload their assignments
 and download files from the server. Currently only `topics` format courses are
 supported. At least partially supported modules:
@@ -15,9 +15,9 @@ supported. At least partially supported modules:
  - `Resource` - description and attached files.
  - `Url` - description and the actual url.
 
-### Usage
+## Usage
 
-#### Authentication
+### Authentication
 To use the tool you will need to acquire your personal Moodle token. This can
 only be done if the Moodle site has enabled the [mobile
 app](https://github.com/moodlehq/moodleapp). There are two ways to get your
@@ -40,31 +40,31 @@ personal token:
    `<first_part>:::<second_part>`, with the `<second_part>` being the token you
    actually need.
 
-#### Interface
+### Interface
 To use the app, you simply need to run the executable. 
 
-### Installing
+## Installing
 Currently we don't provide any prebuilt binaries, so one has to build for himself and put the final executable in [path](https://en.wikipedia.org/wiki/PATH_(variable))
 
-#### Compiling
+### Compiling
 
-##### Operating system
+#### Operating system
 While it has only been built and tested on linux, it is coded with portability and being cross-platform in mind, so it should be possible to build on MAC OS or Windows.
 
-##### Requirements
+#### Requirements
  - GNU make
  - C compiler (at least C99)
  - [libcurl](https://curl.se/libcurl/)
 
-##### Configuring
+#### Configuring
 Compiling (compiler, target executable, etc) can be configured for your system
 in the `config.mk` file. 
 
-##### Building
+#### Building
 
 run `make` from the root directory.
 
-### Licence and copyright
+## Licence and copyright
 https://github.com/moodle-tui/moot
 
 See LICENCE file   
