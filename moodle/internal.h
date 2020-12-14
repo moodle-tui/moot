@@ -1,6 +1,7 @@
 #ifndef __MT_INTERNAL_H
 #define __MT_INTERNAL_H
 
+#include <stdarg.h>
 #include "json.h"
 #include "moodle.h"
 
@@ -86,7 +87,7 @@ MDArray md_parse_modules(json_value *json, MDError *error);
 MDArray md_parse_topics(json_value *json, MDError *error);
 MDArray md_parse_files(json_value *json, MDError *error);
 void md_parse_assignment_plugins(json_value *configs, MDModAssignment *assignment, MDError *error);
-MDModule *md_locate_courses_module(MDCourse course, int instance, MDError *error);
+MDModule *md_locate_courses_module(MDCourse course, int instance, int id, MDError *error);
 
 void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, char *data, MDError *error);
 void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, char *data, MDError *error);
