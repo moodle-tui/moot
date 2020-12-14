@@ -428,7 +428,7 @@ json_value *md_parse_moodle_json(char *data, MDError *error) {
     if (json) {
         if (json_get_string_no_alloc(json, "exception", &(MDError){0})) {
             cchar *msg = json_get_string_no_alloc(json, "message", &(MDError){0});
-            md_set_error_message(msg ? msg : data);
+            md_error_set_message(msg ? msg : data);
             *error = MD_ERR_MOODLE_EXCEPTION;
         }
     } else {
@@ -507,7 +507,7 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
         cchar *message = md_find_moodle_warning(json);
         if (message) {
             *error = MD_ERR_MOODLE_EXCEPTION;
-            md_set_error_message(message);
+            md_error_set_message(message);
         }
     }
     json_value_free(json);
@@ -532,7 +532,7 @@ void md_client_mod_workshop_submit(MDClient *client,
         cchar *message = md_find_moodle_warning(json);
         if (message) {
             *error = MD_ERR_MOODLE_EXCEPTION;
-            md_set_error_message(message);
+            md_error_set_message(message);
         }
     }
     json_value_free(json);

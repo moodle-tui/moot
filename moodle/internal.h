@@ -35,12 +35,6 @@ struct Memblock {
     MDError *error;
 };
 
-// CURL callback to write data to Memblock;
-static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp);
-
-// CURL callback to write data to Memblock;
-static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp);
-
 // md_malloc allocates allocates memory and sets error on fail.
 void *md_malloc(size_t size, MDError *error);
 
