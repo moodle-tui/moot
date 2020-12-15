@@ -140,6 +140,7 @@ typedef struct MDModWorkshop {
     bool lateSubmissions;      // Allows submitting after due date if true.
     MDRichText description, instructions;
 
+    bool textSubmissionRequired;
     MDFileSubmission fileSubmission;
 } MDModWorkshop;
 

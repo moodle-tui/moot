@@ -5,22 +5,9 @@
 #include <string.h>
 #include "internal.h"
 #include "json.h"
-#define MAX_PARALLEL 20
+#define CURL_MAX_PARALLEL 20
 
-// struct to temporarily hold data while performing http request.
-struct Memblock;
-
-// CURL callback to write data to Memblock;
-static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp);
-
-struct Memblock {
-    char *memory;
-    size_t size;
-    MDError *error;
-};
-
-// CURL callback to write data to Memblock;
-static size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     struct Memblock *mem = (struct Memblock *)userp;
 
@@ -72,7 +59,7 @@ CURL *createCurl(cchar *url, void *data, WriteCallback callback, MDError *error)
     return handle;
 }
 
-static size_t write_stream_callback(void *contents, size_t size, size_t nmemb, void *stream) {
+size_t write_stream_callback(void *contents, size_t size, size_t nmemb, void *stream) {
     return fwrite(contents, size, nmemb, (FILE *)stream);
 }
 
@@ -83,7 +70,7 @@ void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
 
     CURLcode res = curl_easy_perform(handle);
     if (res != CURLE_OK) {
-        md_set_error_message(curl_easy_strerror(res));
+        md_error_set_message(curl_easy_strerror(res));
         *error = MD_ERR_HTTP_REQUEST_FAIL;
     }
 
@@ -103,7 +90,7 @@ char *http_get_request(char *url, MDError *error) {
         if (!*error) {
             res = curl_easy_perform(handle);
             if (res != CURLE_OK) {
-                md_set_error_message(curl_easy_strerror(res));
+                md_error_set_message(curl_easy_strerror(res));
                 *error = MD_ERR_HTTP_REQUEST_FAIL;
                 free(chunk.memory);
                 chunk.memory = NULL;
@@ -126,7 +113,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
         *error = MD_ERR_CURL_FAIL;
         return NULL;
     }
-    curl_multi_setopt(multi, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
+    curl_multi_setopt(multi, CURLMOPT_MAXCONNECTS, (long)CURL_MAX_PARALLEL);
 
     struct Memblock chunks[size];
     for (int i = 0; i < size; ++i) {
@@ -139,7 +126,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
         handles[i] = createCurl(urls[i], (void *)&chunks[i], write_memblock_callback, error);
     }
     if (!*error) {
-        for (transfers = 0; transfers < MAX_PARALLEL && transfers < size; transfers++)
+        for (transfers = 0; transfers < CURL_MAX_PARALLEL && transfers < size; transfers++)
             curl_multi_add_handle(multi, handles[transfers]);
 
         do {
@@ -148,7 +135,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
             while ((msg = curl_multi_info_read(multi, &msgsLeft))) {
                 // TODO curl error
                 if (msg->msg != CURLMSG_DONE) {
-                    md_set_error_message(curl_easy_strerror(msg->data.result));
+                    md_error_set_message(curl_easy_strerror(msg->data.result));
                     *error = MD_ERR_HTTP_REQUEST_FAIL;
                 }
                 curl_multi_remove_handle(multi, msg->easy_handle);
@@ -201,12 +188,12 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error) {
 
             CURLcode response = curl_easy_perform(handle);
             if (response != CURLE_OK) {
-                md_set_error_message(curl_easy_strerror(response));
+                md_error_set_message(curl_easy_strerror(response));
                 *error = MD_ERR_HTTP_REQUEST_FAIL;
             }
         } else {
             *error = MD_ERR_FILE_OPERATION;
-            md_set_error_message(filename);
+            md_error_set_message(filename);
         }
         curl_easy_cleanup(handle);
         curl_mime_free(mime);
@@ -238,7 +225,7 @@ json_value *json_get_property(json_value *json, cchar *key, json_type type, MDEr
         }
     } else {
         *error = MD_ERR_MISSING_JSON_KEY;
-        md_set_error_message(key);
+        md_error_set_message(key);
     }
     return value;
 }

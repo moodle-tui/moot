@@ -33,7 +33,7 @@ void md_set_error_handling_warning() {
     errorHandlingWarningSet = true;
 }
 
-void md_set_error_message(cchar *message) {
+void md_error_set_message(cchar *message) {
     snprintf(msg, MESSAGE_SIZE, "%s", message);
 }
 

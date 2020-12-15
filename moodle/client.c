@@ -88,8 +88,8 @@ MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
             for (int i = 0; i < courses.len && !*error; ++i) {
                 json_value *course = jsonCourses->u.array.values[i];
                 cchar *format = json_get_string_no_alloc(course, "format", error);
-                // only topics format courses are supported
-                if (format && strcmp(format, "topics") != 0) {
+                // only topics or weeks format courses are supported
+                if (format && strcmp(format, "topics") && strcmp(format, "weeks")) {
                     ++skip;
                     continue;
                 }
@@ -103,7 +103,7 @@ MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
     } else {
         *error = MD_ERR_INVALID_JSON_VALUE;
     }
-    md_load_courses_topics(client, courses, error);
+    md_courses_fetch_topic_contents(client, courses, error);
     json_value_free(jsonCourses);
     return courses;
 }
@@ -355,7 +355,7 @@ MDArray md_parse_topics(json_value *json, MDError *error) {
     return topicArr;
 }
 
-void md_load_courses_topics(MDClient *client, MDArray courses, MDError *error) {
+void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError *error) {
     // TODO: add other mod loading.
     int count = courses.len + 4;
     char urls[count][MD_URL_LENGTH];
@@ -428,7 +428,7 @@ json_value *md_parse_moodle_json(char *data, MDError *error) {
     if (json) {
         if (json_get_string_no_alloc(json, "exception", &(MDError){0})) {
             cchar *msg = json_get_string_no_alloc(json, "message", &(MDError){0});
-            md_set_error_message(msg ? msg : data);
+            md_error_set_message(msg ? msg : data);
             *error = MD_ERR_MOODLE_EXCEPTION;
         }
     } else {
@@ -475,7 +475,7 @@ long md_client_upload_files(MDClient *client, MDArray filenames, MDError *error)
     return itemId;
 }
 
-cchar *md_find_moodle_warnings(json_value *json) {
+cchar *md_find_moodle_warning(json_value *json) {
     json_value *warnings;
     if ((warnings = json_get_property_silent(json, "warnings"))) {
         json = warnings;
@@ -501,13 +501,13 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
                                                       "&plugindata[files_filemanager]=%ld"
                                                       "&plugindata[onlinetext_editor][text]="
                                                       "&plugindata[onlinetext_editor][format]=4"
-                                                      "&plugindata[onlinetext_editor][itemid]=%ld",
-                                                      assignment->instance, itemId, itemId);
+                                                      "&plugindata[onlinetext_editor][itemid]=0",
+                                                      assignment->instance, itemId);
     if (!*error) {
-        cchar *message = md_find_moodle_warnings(json);
+        cchar *message = md_find_moodle_warning(json);
         if (message) {
             *error = MD_ERR_MOODLE_EXCEPTION;
-            md_set_error_message(message);
+            md_error_set_message(message);
         }
     }
     json_value_free(json);
@@ -522,23 +522,26 @@ void md_client_mod_workshop_submit(MDClient *client,
     long itemId = md_client_upload_files(client, filenames, error);
     if (*error)
         return;
-
+    char content[2] = {0, 0};
+    if (workshop->contents.workshop.textSubmissionRequired)
+        content[0] = '-';
     json_value *json = md_client_do_http_json_request(client, error, "mod_workshop_add_submission",
                                                       "&workshopid=%d"
                                                       "&title=%s"
+                                                      "&content=%s"
                                                       "&attachmentsid=%ld",
-                                                      workshop->instance, title, itemId);
+                                                      workshop->instance, title, content, itemId);
     if (!*error) {
-        cchar *message = md_find_moodle_warnings(json);
+        cchar *message = md_find_moodle_warning(json);
         if (message) {
             *error = MD_ERR_MOODLE_EXCEPTION;
-            md_set_error_message(message);
+            md_error_set_message(message);
         }
     }
     json_value_free(json);
 }
 
-MDModule *md_locate_courses_module(MDCourse course, int instance, int id, MDError *error) {
+MDModule *md_course_locate_module(MDCourse course, int instance, int id, MDError *error) {
     // TODO: optimize for log n lookup
     for (int i = 0; i < course.topics.len; ++i) {
         MDTopic topic = MD_ARR(course.topics, MDTopic)[i];
@@ -565,7 +568,7 @@ MDArray md_parse_files(json_value *jsonFiles, MDError *error) {
     return files;
 }
 
-void md_parse_assignment_plugins(json_value *configs, MDModAssignment *assignment, MDError *error) {
+void md_parse_mod_assignment_plugins(json_value *configs, MDModAssignment *assignment, MDError *error) {
     for (int i = 0; i < configs->u.array.length && (!*error); ++i) {
         json_value *config = configs->u.array.values[i];
         cchar *plugin = json_get_string_no_alloc(config, "plugin", error);
@@ -601,15 +604,13 @@ void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses
                 break;
             int index = -1;
             for (int j = 0; j < courses.len && index < 0; ++j) {
-                // Hoping that the order of preloaded courses and assignment courses is the same
-                // printf("%s %d\n",MD_ARR(courses, MDCourse)[(i + j) % courses.len].name, MD_ARR(courses, MDCourse)[(i
-                // + j) % courses.len].id);
+                // Hoping that the order of preloaded courses and assignment courses is the same;
                 if (MD_ARR(courses, MDCourse)[(i + j) % courses.len].id == courseId) {
                     index = (i + j) % courses.len;
                 }
             }
             if (index < 0) {
-                // TODO: check if this is actualy not a topics course
+                // TODO: check if this is actually not a topics course
                 continue;
             }
             MDCourse course = MD_ARR(courses, MDCourse)[index];
@@ -624,7 +625,7 @@ void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses
                 int moduleId = json_get_integer(jsonAssignment, "cmid", error);
                 if (*error)
                     break;
-                MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
+                MDModule *module = md_course_locate_module(course, instance, moduleId, error);
                 if (*error)
                     break;
                 module->type = MD_MOD_ASSIGNMENT;
@@ -639,7 +640,7 @@ void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses
                     assignment->files = md_parse_files(jsonAttachments, error);
                 json_value *configs = json_get_array(jsonAssignment, "configs", error);
                 if (configs)
-                    md_parse_assignment_plugins(configs, assignment, error);
+                    md_parse_mod_assignment_plugins(configs, assignment, error);
             }
         }
     }
@@ -674,7 +675,7 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             int moduleId = json_get_integer(jsonWorkshop, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
+            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_WORKSHOP;
@@ -686,6 +687,7 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             workshop->description.format = json_get_integer(jsonWorkshop, "introformat", error);
             workshop->instructions.text = json_get_string(jsonWorkshop, "instructauthors", error);
             workshop->instructions.format = json_get_integer(jsonWorkshop, "instructauthorsformat", error);
+            workshop->textSubmissionRequired = json_get_integer(jsonWorkshop, "submissiontypetext", error);
             workshop->fileSubmission.status = json_get_integer(jsonWorkshop, "submissiontypefile", error);
             if (workshop->fileSubmission.status != MD_SUBMISSION_DISABLED) {
                 workshop->fileSubmission.acceptedFileTypes =
@@ -728,7 +730,7 @@ void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, 
             int moduleId = json_get_integer(jsonResource, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
+            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_RESOURCE;
@@ -771,7 +773,7 @@ void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, char 
             int moduleId = json_get_integer(jsonUrl, "coursemodule", error);
             if (*error)
                 break;
-            MDModule *module = md_locate_courses_module(course, instance, moduleId, error);
+            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
             if (*error)
                 break;
             module->type = MD_MOD_URL;
