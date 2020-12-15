@@ -6,18 +6,23 @@
 #include "utf8.c"
 #include "wcwidth.h"
 #include <curl/curl.h>
-
 #include "moodle.h"
-// #include "util.h"
 
-int main () {
+int main() {
     curl_global_init(CURL_GLOBAL_ALL);
 
     FILE *f = fopen(".token", "r");
     char token[100];
     fread_line(f, token, 99);
+    printf("%s", token);
     MDError err;
     MDClient *client = md_client_new(token, "https://emokymai.vu.lt", &err);
+    if (err) {
+        char msg[100];
+        sprintf(msg, "%s", md_error_get_message(err));
+        printErr(msg);
+        return 0;
+    }
 
     md_client_init(client, &err);
     if (err) {
@@ -33,14 +38,13 @@ int main () {
         printErr(msg);
         return 0;
     }
-
     MenuInfo menuInfo = {
         .HLOptions = {0},
         .depth = 0,
         .isCurrentFile = 0,
         .client = client,
     };
-    MDCourse* courses = MD_ARR(courseArr, MDCourse);
+
     hidecursor();
     mainLoop(courseArr, &menuInfo);
     cls();
@@ -53,9 +57,9 @@ int main () {
 }
 
 void mainLoop (MDArray courses, MenuInfo *menuInfo) {
-    _Bool isOptionChosen = 0;
+    Action action;
 
-    while (!isOptionChosen) {
+    while (action != ACTION_QUIT) {
         menuInfo->widths = getWidthsOfOptions(strlen(SEPERATOR));
         int *heights = getHeights(courses, menuInfo->HLOptions);
         int maxHeight = getMax(heights, 3);
@@ -64,19 +68,16 @@ void mainLoop (MDArray courses, MenuInfo *menuInfo) {
             maxHeight = terminalHeight - 1;
         }
 
-        cls();
+        locate(0, 0);
         menuInfo->currentMaxDepth = 0;
         printMenu(courses, menuInfo, maxHeight);
 
-        Action action;
         do {
             int key = getkey();
             KeyDef keyDef = getKeyDef(key);
             action = getAction(courses, menuInfo, keyDef);
         } while (action == ACTION_INVALID);
 
-        if (action == ACTION_QUIT)
-            break;
         doAction(menuInfo, courses, heights[menuInfo->depth], action);
     }
 }
@@ -89,33 +90,47 @@ int *getHeights(MDArray courses, int *hl) {
     return heights;
 }
 
-void printMenu(MDArray courses, MenuInfo *menuInfo, int height) {
+void printMenu(MDArray courses, MenuInfo *menuInfo, int maxHeight) {
     MDArray topics = MD_COURSES(courses)[menuInfo->HLOptions[0]].topics;
     MDArray modules = MD_TOPICS(topics)[menuInfo->HLOptions[1]].modules;
     MDModResource resource;
+    int height;
 
-    for (int i = 0; i < height; ++i) {
+    for (height = 0; height < maxHeight; ++height) {
         int depthIndex = -2;
         addOption(" ", menuInfo, ++depthIndex, 0); // first empty options column
-        addMDArrayOption(courses, menuInfo, i, ++depthIndex);
-        addMDArrayOption(topics, menuInfo, i, ++depthIndex);
-        addMDArrayOption(modules, menuInfo, i, ++depthIndex);
+        addMDArrayOption(courses, menuInfo, height, ++depthIndex);
+        addMDArrayOption(topics, menuInfo, height, ++depthIndex);
+        addMDArrayOption(modules, menuInfo, height, ++depthIndex);
 
         if (modules.len > 0 && MD_MODULES(modules)[menuInfo->HLOptions[2]].type == MD_MOD_RESOURCE) {
-            if (i == 0)
-                addOption("Files", menuInfo, ++depthIndex, menuInfo->HLOptions[3] == i);
+            if (height == 0)
+                addOption("Files", menuInfo, ++depthIndex, menuInfo->HLOptions[3] == height);
+            else
+                addOption("", menuInfo, ++depthIndex, 0);
+
             resource = MD_MODULES(modules)[menuInfo->HLOptions[2]].contents.resource;
-            if (resource.files.len > i) {
-                addOption(MD_FILES(resource.files)[i].filename, menuInfo, ++depthIndex,
-                          menuInfo->HLOptions[4] == i);
-                if (menuInfo->depth == depthIndex)
+            if (resource.files.len > height) {
+                addOption(MD_FILES(resource.files)[height].filename, menuInfo, ++depthIndex,
+                          menuInfo->HLOptions[4] == height);
+                if (menuInfo->depth == depthIndex) {
                     menuInfo->isCurrentFile = 1;
+                }
                 else
                     menuInfo->isCurrentFile = 0;
             }
+            else
+                addOption("", menuInfo, ++depthIndex, 0);
         }
+        else {
+            addOption("", menuInfo, ++depthIndex, 0);
+            addOption("", menuInfo, ++depthIndex, 0);
+        }
+        addOption("", menuInfo, ++depthIndex, 0);
         printf("\n");
     }
+
+    clean(tcols(), trows() - height - 1);
 }
 
 void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int depthIndex) {
@@ -126,8 +141,6 @@ void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int 
     else {
         if (heightIndex == 0)
             name = EMPTY_OPTION_NAME;
-        else if (depthIndex == 2)
-            return;
         else
             name = " ";
     }
@@ -214,9 +227,18 @@ void printOption(char *optionName, int width) {
 KeyDef getKeyDef(int key) {
     KeyDef keyDef;
     switch (key) {
+        case 108: // l
+        case KEY_RIGHT:
+        case 10: // enter
+            keyDef = KD_RIGHT;
+            break;
         case 106: // j
         case KEY_DOWN:
             keyDef = KD_DOWN;
+            break;
+        case 104: // h
+        case KEY_LEFT:
+            keyDef = KD_LEFT;
             break;
         case 107: // k
         case KEY_UP:
@@ -226,25 +248,25 @@ KeyDef getKeyDef(int key) {
             if (getkey() == 91) {
                 key = getkey();
                 switch (key) {
-                case 66: // key down
-                    keyDef = KD_DOWN;
-                    break;
-                case 65: // key up
-                    keyDef = KD_UP;
+                    case 67: // arrow key right
+                        keyDef = KD_RIGHT;
+                        break;
+                    case 66: // arrow key down
+                        keyDef = KD_DOWN;
+                        break;
+                    case 65: // arrow key up
+                        keyDef = KD_UP;
+                        break;
+                    case 68: // arrow key left
+                        keyDef = KD_LEFT;
                 }
             }
             break;
-        case 104: // h
-        case KEY_LEFT:
-            keyDef = KD_LEFT;
-            break;
-        case 108: // l
-        case KEY_RIGHT:
-        case 10: // enter
-            keyDef = KD_RIGHT;
-            break;
         case 113: // q
             keyDef = KD_QUIT;
+            break;
+        case 115: // s
+            keyDef = KD_DOWNLOAD;
     }
     return keyDef;
 }
@@ -253,9 +275,7 @@ Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef) {
     Action action;
     switch (keyDef) {
         case KD_RIGHT:
-            if (menuInfo->isCurrentFile)
-                action = ACTION_DOWNLOAD;
-            else if (menuInfo->depth < menuInfo->currentMaxDepth)
+            if (menuInfo->depth < menuInfo->currentMaxDepth)
                 action = ACTION_GO_RIGHT;
             else
                 action = ACTION_INVALID;
@@ -271,6 +291,9 @@ Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef) {
             break;
         case KD_UP:
             action = ACTION_GO_UP;
+            break;
+        case KD_DOWNLOAD:
+            action = ACTION_DOWNLOAD;
             break;
         case KD_QUIT:
             action = ACTION_QUIT;
@@ -300,7 +323,7 @@ void doAction(MenuInfo *menuInfo, MDArray courses, int nrOfOptions, Action actio
             downloadFile(mdFile, menuInfo->client);
             break;
         default:
-            printErr("Invalid action");
+            break;
     }
 }
 
@@ -344,10 +367,17 @@ MDFile getMDFile(MDArray courses, MenuInfo *menuInfo) {
 
 void downloadFile(MDFile mdFile, MDClient *client) {
     FILE* file = fopen(mdFile.filename, "w");
-    if (!file)
-        printErr("Couldn't open file for writing");
+    char msg[1000];
+    if (!file) {
+        sprintf(msg, "Couldn't open %s for writing", mdFile.filename);
+        printErr(msg);
+    }
     MDError err;
+    sprintf(msg, "Downloading: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
+    notifySmall(msg, BLUE);
     md_client_download_file(client, &mdFile, file, &err);
+    sprintf(msg, "Downloaded: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
+    notifySmall(msg, GREEN);
     fclose(file);
 
     if (err) {
@@ -355,10 +385,6 @@ void downloadFile(MDFile mdFile, MDClient *client) {
         sprintf(msg, "%s", md_error_get_message(err));
         printErr(msg);
     }
-}
-
-void printSpaces(int count) {
-    printf("%*s", count, "");
 }
 
 int *getWidthsOfOptions(int sepLength) {
@@ -370,6 +396,17 @@ int *getWidthsOfOptions(int sepLength) {
     return widthOfColumns;
 }
 
+void clean (int width, int height) {
+    for (int i = 0; i < height; ++i) {
+        printSpaces(width);
+        printf("\n");
+    }
+}
+
+void printSpaces(int count) {
+    printf("%*s", count, "");
+}
+
 int getMax(int *array, int size) {
     int max = 0;
     for (int i = 0; i < size; ++i) {
@@ -379,28 +416,68 @@ int getMax(int *array, int size) {
     return max;
 }
 
-void printErr(char *msg) {
-    showcursor();
-    locate(0, 0);
+void notifyBig(char *msg, int color) {
+    int msgLen = strlen(msg);
+    int x = (tcols() / 2) - (msgLen / 2);
+    int y = trows() / 2 - 2;
+    locate(x, y);
     saveDefaultColor();
-    setBackgroundColor(4);
-    printf("Error: %s\n", msg);
+    setColor(color);
+    
+    printf(" ┌");
+    for (int i = 0; i < msgLen + 2; ++i)
+        printf("─");
+    printf("┐ \n");
+
+    locate(x, ++y);
+    printf(" │ ");
+    resetColor();
+    printf("%s", msg);
+    setColor(color);
+    printf(" │ \n");
+
+    locate(x, ++y);
+    printf(" └");
+    for (int i = 0; i < msgLen + 2; ++i)
+        printf("─");
+    printf("┘ ");
+
     resetColor();
     getch();
 }
 
-int fread_line(FILE *file, char *s, int n) {
+void notifySmall(char *msg, int color) {
+    locate (0, trows());
+    printSpaces(tcols());
+    locate (0, trows());
+    saveDefaultColor();
+    setColor(color);
+    printf(" %s ",  msg);
+    resetColor();
+}
+
+void printErr(char *msg) {
+    showcursor();
+    locate(0, 0);
+    saveDefaultColor();
+    setBackgroundColor(RED);
+    printf("Error: %s ", msg);
+    resetColor();
+    getch();
+}
+
+int fread_line(FILE *f, char *s, int n) {
     s[0] = '\0';
     int len = 0, cutOff = 0;
     char c = 0;
     do {
-        c = fgetc(file);
-        if (c != '\n' && !feof(file)) {
+        c = fgetc(f);
+        if (c != '\n' && !feof(f)) {
             if (len == n) cutOff = 1;
 
             if (len < n) s[len++] = c;
         }
-    } while (!feof(file) && c != '\n');
+    } while (!feof(f) && c != '\n');
     s[len] = '\0';
     return cutOff;
 }
