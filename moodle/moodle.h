@@ -2,15 +2,21 @@
 #define __MOODLE_H
 
 /*
- * Copyright (C) 2020 Nojus Gudinavičius
- * nojus.gudinavicius@gmail.com
+ * Copyright (C) 2020 Nojus Gudinavičius nojus.gudinavicius@gmail.com
  * https://github.com/moodle-tui/moot
- * 
- * Moodle SDK
- * This is a heavily simplified and minimized Moodle SDK interacting through
- * Moodle webservice api. Built for and tested with moodle 3.1.
+ *
+ * Moodle SDK. This is a heavily simplified and minimized Moodle SDK interacting
+ * through Moodle webservice api. Built for and tested with moodle 3.1.
  * https://docs.moodle.org/310/en/Web_services
  *
+ * An example of use can be found in subfolder test. However, the example there
+ * is more focused on testing the library, rather than displaying it's
+ * capabilities (e. g. header internal.h should not be included by a user of
+ * this library).
+ *
+ * Another example is the code in folder ui, which is a more complicated example
+ * of how this library can be used to make an user interface, developed by
+ * Ramojus Lapinskas.
 */
 
 

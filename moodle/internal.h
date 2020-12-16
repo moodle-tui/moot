@@ -1,6 +1,12 @@
 #ifndef __MT_INTERNAL_H
 #define __MT_INTERNAL_H
 
+/*
+ * Copyright (C) 2020 Nojus Gudinavičius
+ * nojus.gudinavicius@gmail.com
+ * https://github.com/moodle-tui/moot
+ */
+
 #include <stdarg.h>
 #include "json.h"
 #include "moodle.h"

@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <curl/curl.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,17 +6,26 @@
 #include "internal.h"
 #include "json.h"
 #include "moodle.h"
+
+// printf with a newline
 #define println(format, ...) printf(format "\n", ##__VA_ARGS__)
+
+// similar to assert, but instead of terminating makes a goto to end;
 #define assertend(expr)                                         \
     if (!(expr)) {                                              \
         println("Assert failed: %s\nline:%d", #expr, __LINE__); \
         goto end;                                               \
     }
+
+// Checks if a string is valid.
 #define teststr(str) assertend(str != NULL)
 
+#define DEMO_SITE "https://school.moodledemo.net"
+
+// Gets token from 
 char *get_token(MDError *error) {
     char *data = http_get_request(
-        "https://school.moodledemo.net/login/token.php"
+        DEMO_SITE "/login/token.php"
         "?username=markellis267&password=moodle&service=moodle_mobile_app",
         error);
     char *token = NULL;
@@ -49,7 +57,7 @@ int main() {
         goto end;
 
     println("Creating client");
-    MDClient *client = md_client_new(token, "https://school.moodledemo.net", &error);
+    MDClient *client = md_client_new(token, DEMO_SITE, &error);
     if (error)
         goto end;
 
@@ -132,7 +140,7 @@ int main() {
                         teststr(module->contents.url.url);
                         break;
                     default:
-                        assertend(("Unexpected MOD TYPE", false));
+                        assertend("Unexpected MOD TYPE" == false);
                 }
             }
         }
@@ -143,20 +151,23 @@ int main() {
     md_client_mod_assign_submit(client, assignment2, MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), &error);
     if (error)
         goto end;
-    println("Ok. Check for success on https://school.moodledemo.net/mod/assign/view.php?id=%d", assignment1->id);
-    println("Ok. Check for success on https://school.moodledemo.net/mod/assign/view.php?id=%d", assignment2->id);
+    println("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d", assignment1->id);
+    println("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d", assignment2->id);
 
     println("Testing module workshop submission");
     md_client_mod_workshop_submit(client, workshop1, MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), "ttitle",
                                   &error);
     if (error)
         goto end;
-    println("Ok. Check for success on https://school.moodledemo.net/mod/workshop/view.php?id=%d", workshop1->id);
+    println("Ok. Check for success on " DEMO_SITE "/mod/workshop/view.php?id=%d", workshop1->id);
 end:
     if (error)
         printf("Error: %s\n", md_error_get_message(error));
     else
         println("Done");
+
+    // Cleaning up.
+
     free(token);
     md_client_cleanup(client);
     md_courses_cleanup(courses);
