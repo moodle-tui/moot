@@ -22,12 +22,12 @@
 
 #define DEMO_SITE "https://school.moodledemo.net"
 
-// Gets token from 
+// Gets token from
 char *get_token(MDError *error) {
-    char *data = http_get_request(
-        DEMO_SITE "/login/token.php"
-        "?username=markellis267&password=moodle&service=moodle_mobile_app",
-        error);
+    char *data = http_get_request(DEMO_SITE
+                                  "/login/token.php"
+                                  "?username=markellis267&password=moodle&service=moodle_mobile_app",
+                                  error);
     char *token = NULL;
     if (!*error) {
         json_value *json = md_parse_moodle_json(data, error);
@@ -38,15 +38,6 @@ char *get_token(MDError *error) {
     }
     free(data);
     return token;
-}
-
-MDModule *locate_module(MDArray courses, int courseId, int moduleId, int instance, MDError *error) {
-    for (int i = 0; i < courses.len; ++i) {
-        if (MD_COURSES(courses)[i].id == courseId)
-            return md_course_locate_module(MD_COURSES(courses)[i], instance, moduleId, error);
-    }
-    *error = MD_ERR_MISMACHING_MOODLE_DATA;
-    return NULL;
 }
 
 int main() {
@@ -84,8 +75,8 @@ int main() {
         goto end;
 
     println("Checking specific modules");
-    MDModule *assignment1 = locate_module(courses, 66, 788, 119, &error);
-    MDModule *assignment2 = locate_module(courses, 56, 573, 95, &error);
+    MDModule *assignment1 = md_courses_locate_module(courses, 66, 788, 119, &error);
+    MDModule *assignment2 = md_courses_locate_module(courses, 56, 573, 95, &error);
     if (error)
         goto end;
     assertend(assignment1->type == MD_MOD_ASSIGNMENT);
@@ -93,7 +84,7 @@ int main() {
     assertend(strcmp(assignment1->name, "Assignment 2 (Upload)") == 0);
     assertend(strcmp(assignment2->name, "Assignment: Causes of the October 1917 Revolution") == 0);
 
-    MDModule *workshop1 = locate_module(courses, 6, 90, 1, &error);
+    MDModule *workshop1 = md_courses_locate_module(courses, 6, 90, 1, &error);
     if (error)
         goto end;
     assertend(workshop1->type == MD_MOD_WORKSHOP);
@@ -103,15 +94,15 @@ int main() {
     for (int i = 0; i < courses.len; ++i) {
         MDCourse *course = &MD_COURSES(courses)[i];
         teststr(course->name);
-        // println("%s", course->name);
+        println("%s", course->name);
         for (int j = 0; j < course->topics.len; ++j) {
             MDTopic *topic = &MD_TOPICS(course->topics)[j];
-            // println(" - %s", topic->name);
+            println(" - %s", topic->name);
             teststr(topic->name);
             teststr(topic->summary.text);
             for (int k = 0; k < topic->modules.len; ++k) {
                 MDModule *module = &MD_MODULES(topic->modules)[k];
-                // println("    - %s %d", module->name, module->instance);
+                println("    - %s %d", module->name, module->instance);
                 teststr(module->name);
                 switch (module->type) {
                     case MD_MOD_ASSIGNMENT:

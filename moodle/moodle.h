@@ -86,12 +86,14 @@ typedef struct MDClient {
 // never be returned, as unsuported modules are simply skipped when fetching
 // courses.
 typedef enum MDModType {
-    MD_MOD_UNSUPPORTED,
-    MD_MOD_ASSIGNMENT = 1,
-    MD_MOD_WORKSHOP = 2,
-    MD_MOD_RESOURCE = 3,
-    MD_MOD_URL = 4,
+    MD_MOD_ASSIGNMENT,
+    MD_MOD_WORKSHOP,
+    MD_MOD_RESOURCE,
+    MD_MOD_URL,
+    MD_MOD_UNSUPPORTED, // Must be the last entry.
 } MDModType;
+
+#define MD_MOD_COUNT MD_MOD_UNSUPPORTED
 
 // MDTextFormat contains avaiable moodle text formats. HTML is used ussualy though.
 typedef enum MDTextFormat {

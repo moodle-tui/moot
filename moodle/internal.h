@@ -59,10 +59,10 @@ void http_get_request_to_file(char *url, FILE *stream, MDError *error);
 char *http_get_request(char *url, MDError *error);
 
 // http_get_multi_request makes multiple http requests at once. Each element of
-// the returned 2D array and the array itself needs to be freed by the caller. 
+// the returned 2D array and the array itself needs to be freed by the caller.
 char **http_get_multi_request(char *urls[], unsigned int size, MDError *error);
 
-// http_post_file posts a file specified by the filename to the given url. 
+// http_post_file posts a file specified by the filename to the given url.
 // @param name multipart field name of the field with file contents
 // @return response data, that the caller is responsible to free.
 char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error);
@@ -75,7 +75,6 @@ json_value *json_get_property_silent(json_value *json, cchar *key);
 // type.
 json_value *json_get_property(json_value *json, cchar *key, json_type type, MDError *error);
 
-
 // json getters for specific types:
 
 long json_get_integer(json_value *json, cchar *key, MDError *error);
@@ -86,11 +85,21 @@ json_value *json_get_array(json_value *json, cchar *key, MDError *error);
 
 // client.c
 
+typedef void (*MDParseFunc)(MDClient *client, MDArray courses, json_value *json, MDError *error);
+
 // MDInitFunc is the callback called by md_array_init_new for each created element.
-typedef void (*MDInitFunc)(void *, MDError *);
+typedef void (*MDInitFunc)(void *);
 
 // MDInitFunc is the callback called by md_array_cleanup for each created element.
 typedef void (*MDCleanupFunc)(void *);
+
+typedef struct MDMod {
+    MDModType type;
+    const char *name, *parseWsfunction;
+    MDParseFunc parseFunc;
+    MDInitFunc initFunc;
+    MDCleanupFunc cleanupFunc;
+} MDMod;
 
 // md_array_init_new initializes given array, optionaly calling callback for each created element
 // (if callback isn't NULL). The array must be cleaned later up using md_array_cleanup.
@@ -100,7 +109,7 @@ void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callb
 // (if callback isn't NULL).
 void md_array_cleanup(MDArray *array, size_t size, MDCleanupFunc callback);
 
-// md_client_write_url formats url for Moodle webservice request. 
+// md_client_write_url formats url for Moodle webservice request.
 void md_client_write_url(MDClient *client, char *url, cchar *wsfunction, cchar *format, ...);
 
 // same as md_client_write_url, but with va_list.
@@ -129,9 +138,8 @@ long md_client_upload_file(MDClient *client, cchar *filename, long itemId, MDErr
 // @return itemId on success, pointing to uploaded files.
 long md_client_upload_files(MDClient *client, MDArray filenames, MDError *error);
 
-// md_find_moodle_warning returns the first found warning in the json or NULL; 
+// md_find_moodle_warning returns the first found warning in the json or NULL;
 cchar *md_find_moodle_warning(json_value *json);
-
 
 // initialization to default values and cleanup functions for various datatypes:
 
@@ -142,14 +150,14 @@ void md_topic_init(MDTopic *topic);
 void md_topic_cleanup(MDTopic *topic);
 void md_module_init(MDModule *module);
 void md_module_cleanup(MDModule *module);
-void md_mod_assignment_init(MDModAssignment *assignment);
-void md_mod_assignment_cleanup(MDModAssignment *assignment);
-void md_mod_workshop_init(MDModWorkshop *workshop);
-void md_mod_workshop_cleanup(MDModWorkshop *workshop);
-void md_mod_resource_init(MDModResource *resource);
-void md_mod_resource_cleanup(MDModResource *resource);
-void md_mod_url_init(MDModUrl *url);
-void md_mod_url_cleanup(MDModUrl *url);
+void md_mod_assignment_init(MDModule *assignment);
+void md_mod_assignment_cleanup(MDModule *assignment);
+void md_mod_workshop_init(MDModule *workshop);
+void md_mod_workshop_cleanup(MDModule *workshop);
+void md_mod_resource_init(MDModule *resource);
+void md_mod_resource_cleanup(MDModule *resource);
+void md_mod_url_init(MDModule *url);
+void md_mod_url_cleanup(MDModule *url);
 void md_rich_text_init(MDRichText *richText);
 void md_rich_text_cleanup(MDRichText *richText);
 void md_file_submission_init(MDFileSubmission *submission);
@@ -174,20 +182,24 @@ MDArray md_parse_topics(json_value *json, MDError *error);
 MDArray md_parse_files(json_value *json, MDError *error);
 
 // md_parse_mod_assignment_plugins parses settings for mod assignment out of given
-// json, as they have different syntax from the rest. 
+// json, as they have different syntax from the rest.
 void md_parse_mod_assignment_plugins(json_value *configs, MDModAssignment *assignment, MDError *error);
 
-// md_course_locate_module locates and returns pointer to a module from its
-// topics with maching instance and id.
-MDModule *md_course_locate_module(MDCourse course, int instance, int id, MDError *error);
+// md_course_locate_module locates and returns pointer to a module with matching
+// properties if it exists in the given courses array.
+MDModule *md_courses_locate_module(MDArray courses, int courseId, int moduleId, int instance, MDError *error);
 
+// md_courses_locate_json_module similar to md_courses_locate_module, but data
+// needed to identify module is extracted from given json. Json property name
+// of module id should also be suplied (usually cmid or coursemodule).
+MDModule *md_courses_locate_json_module(MDArray courses, json_value *json, cchar *moduleIdJsonName, MDError *error);
 
 // for efficiency, data for modules is fetched at once and then applied to
 // courses using following functions:
 
-void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, char *data, MDError *error);
-void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, char *data, MDError *error);
-void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, char *data, MDError *error);
-void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, char *data, MDError *error);
+void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
+void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
+void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
+void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
 
 #endif

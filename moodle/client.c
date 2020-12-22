@@ -16,6 +16,42 @@
 #define MD_NO_IDENTIFIER -1
 #define MD_NO_ITEM_ID 0
 
+// List of known modules. Order is important. Indeces should match the types (MDModType).
+MDMod mdModList[MD_MOD_COUNT] = {
+    {
+        .type = MD_MOD_ASSIGNMENT,
+        .name = "assign",
+        .parseWsfunction = "mod_assign_get_assignments",
+        .parseFunc = md_client_courses_set_mod_assignment_data,
+        .initFunc = (MDInitFunc)md_mod_assignment_init,
+        .cleanupFunc = (MDCleanupFunc)md_mod_assignment_cleanup,
+    },
+    {
+        .type = MD_MOD_WORKSHOP,
+        .name = "workshop",
+        .parseWsfunction = "mod_workshop_get_workshops_by_courses",
+        .parseFunc = md_client_courses_set_mod_workshop_data,
+        .initFunc = (MDInitFunc)md_mod_workshop_init,
+        .cleanupFunc = (MDCleanupFunc)md_mod_workshop_cleanup,
+    },
+    {
+        .type = MD_MOD_RESOURCE,
+        .name = "resource",
+        .parseWsfunction = "mod_resource_get_resources_by_courses",
+        .parseFunc = md_client_courses_set_mod_resource_data,
+        .initFunc = (MDInitFunc)md_mod_resource_init,
+        .cleanupFunc = (MDCleanupFunc)md_mod_resource_cleanup,
+    },
+    {
+        .type = MD_MOD_URL,
+        .name = "url",
+        .parseWsfunction = "mod_url_get_urls_by_courses",
+        .parseFunc = md_client_courses_set_mod_url_data,
+        .initFunc = (MDInitFunc)md_mod_url_init,
+        .cleanupFunc = (MDCleanupFunc)md_mod_url_cleanup,
+    },
+};
+
 MDClient *md_client_new(char *token, char *website, MDError *error) {
     *error = MD_ERR_NONE;
     MDClient *client = (MDClient *)md_malloc(sizeof(MDClient), error);
@@ -118,7 +154,7 @@ void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callb
         array->_data = md_malloc(length * size, error);
         if (array->_data && callback) {
             for (int i = 0; i < length; ++i) {
-                callback(array->_data + i * size, error);
+                callback(array->_data + i * size);
             }
         }
     } else {
@@ -174,39 +210,29 @@ void md_module_init(MDModule *module) {
 }
 
 void md_module_cleanup(MDModule *module) {
-    free(module->name);
-    switch (module->type) {
-        case MD_MOD_ASSIGNMENT:
-            md_mod_assignment_cleanup(&module->contents.assignment);
-            break;
-        case MD_MOD_WORKSHOP:
-            md_mod_workshop_cleanup(&module->contents.workshop);
-            break;
-        case MD_MOD_RESOURCE:
-            md_mod_resource_cleanup(&module->contents.resource);
-            break;
-        case MD_MOD_URL:
-            md_mod_url_cleanup(&module->contents.url);
-            break;
-        default:
-            break;
+    if (module->type != MD_MOD_UNSUPPORTED) {
+        free(module->name);
+        mdModList[module->type].cleanupFunc(module);
     }
 }
 
-void md_mod_assignment_init(MDModAssignment *assignment) {
+void md_mod_assignment_init(MDModule *module) {
+    MDModAssignment *assignment = &module->contents.assignment;
     assignment->fromDate = assignment->dueDate = assignment->cutOffDate = MD_DATE_NONE;
     md_rich_text_init(&assignment->description);
     md_file_submission_init(&assignment->fileSubmission);
     md_array_init(&assignment->files);
 }
 
-void md_mod_assignment_cleanup(MDModAssignment *assignment) {
+void md_mod_assignment_cleanup(MDModule *module) {
+    MDModAssignment *assignment = &module->contents.assignment;
     md_rich_text_cleanup(&assignment->description);
     md_file_submission_cleanup(&assignment->fileSubmission);
     md_array_cleanup(&assignment->files, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
 }
 
-void md_mod_workshop_init(MDModWorkshop *workshop) {
+void md_mod_workshop_init(MDModule *module) {
+    MDModWorkshop *workshop = &module->contents.workshop;
     workshop->fromDate = workshop->dueDate = MD_DATE_NONE;
     md_rich_text_init(&workshop->description);
     md_rich_text_init(&workshop->instructions);
@@ -214,29 +240,34 @@ void md_mod_workshop_init(MDModWorkshop *workshop) {
     md_file_submission_init(&workshop->fileSubmission);
 }
 
-void md_mod_workshop_cleanup(MDModWorkshop *workshop) {
+void md_mod_workshop_cleanup(MDModule *module) {
+    MDModWorkshop *workshop = &module->contents.workshop;
     md_rich_text_cleanup(&workshop->description);
     md_rich_text_cleanup(&workshop->instructions);
     md_file_submission_cleanup(&workshop->fileSubmission);
 }
 
-void md_mod_url_init(MDModUrl *url) {
+void md_mod_url_init(MDModule *module) {
+    MDModUrl *url = &module->contents.url;
     md_rich_text_init(&url->description);
     url->name = url->url = NULL;
 }
 
-void md_mod_url_cleanup(MDModUrl *url) {
+void md_mod_url_cleanup(MDModule *module) {
+    MDModUrl *url = &module->contents.url;
     md_rich_text_cleanup(&url->description);
     free(url->name);
     free(url->url);
 }
 
-void md_mod_resource_init(MDModResource *resource) {
+void md_mod_resource_init(MDModule *module) {
+    MDModResource *resource = &module->contents.resource;
     md_rich_text_init(&resource->description);
     md_array_init(&resource->files);
 }
 
-void md_mod_resource_cleanup(MDModResource *resource) {
+void md_mod_resource_cleanup(MDModule *module) {
+    MDModResource *resource = &module->contents.resource;
     md_rich_text_cleanup(&resource->description);
     md_array_cleanup(&resource->files, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
 }
@@ -273,14 +304,10 @@ void md_file_cleanup(MDFile *file) {
 }
 
 MDModType md_get_mod_type(cchar *module) {
-    if (!strcmp(module, "assign"))
-        return MD_MOD_ASSIGNMENT;
-    if (!strcmp(module, "resource"))
-        return MD_MOD_RESOURCE;
-    if (!strcmp(module, "workshop"))
-        return MD_MOD_WORKSHOP;
-    if (!strcmp(module, "url"))
-        return MD_MOD_URL;
+    for (MDModType mod = 0; mod < MD_MOD_COUNT; ++mod) {
+        if (!strcmp(module, mdModList[mod].name))
+            return mdModList[mod].type;  // equal to mod anyway
+    }
     return MD_MOD_UNSUPPORTED;
 }
 
@@ -295,32 +322,17 @@ MDArray md_parse_modules(json_value *json, MDError *error) {
 
         for (int i = 0; i < json->u.array.length && !*error; ++i) {
             json_value *jsonModule = json->u.array.values[i];
-            cchar *type = json_get_string_no_alloc(jsonModule, "modname", error);
-            if (!type || (modules[i - skip].type = md_get_mod_type(type)) == MD_MOD_UNSUPPORTED) {
-                ++skip;
-                continue;
-            }
             bool userVisible = json_get_bool(jsonModule, "uservisible", error);
             if (*error || !userVisible) {
                 ++skip;
                 continue;
             }
-            switch (modules[i - skip].type) {
-                case MD_MOD_ASSIGNMENT:
-                    md_mod_assignment_init(&modules[i - skip].contents.assignment);
-                    break;
-                case MD_MOD_WORKSHOP:
-                    md_mod_workshop_init(&modules[i - skip].contents.workshop);
-                    break;
-                case MD_MOD_RESOURCE:
-                    md_mod_resource_init(&modules[i - skip].contents.resource);
-                    break;
-                case MD_MOD_URL:
-                    md_mod_url_init(&modules[i - skip].contents.url);
-                    break;
-                default:
-                    break;
+            cchar *type = json_get_string_no_alloc(jsonModule, "modname", error);
+            if (!type || (modules[i - skip].type = md_get_mod_type(type)) == MD_MOD_UNSUPPORTED) {
+                ++skip;
+                continue;
             }
+            mdModList[modules[i - skip].type].initFunc(&modules[i - skip]);
             modules[i - skip].name = json_get_string(jsonModule, "name", error);
             modules[i - skip].id = json_get_integer(jsonModule, "id", error);
             modules[i - skip].instance = json_get_integer(jsonModule, "instance", error);
@@ -356,17 +368,15 @@ MDArray md_parse_topics(json_value *json, MDError *error) {
 }
 
 void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError *error) {
-    // TODO: add other mod loading.
-    int count = courses.len + 4;
+    int count = courses.len + MD_MOD_COUNT;
     char urls[count][MD_URL_LENGTH];
     for (int i = 0; i < courses.len; ++i) {
         md_client_write_url(client, urls[i], "core_course_get_contents", "&courseid=%d",
                             MD_ARR(courses, MDCourse)[i].id);
     }
-    md_client_write_url(client, urls[count - MD_MOD_ASSIGNMENT], "mod_assign_get_assignments", "");
-    md_client_write_url(client, urls[count - MD_MOD_WORKSHOP], "mod_workshop_get_workshops_by_courses", "");
-    md_client_write_url(client, urls[count - MD_MOD_RESOURCE], "mod_resource_get_resources_by_courses", "");
-    md_client_write_url(client, urls[count - MD_MOD_URL], "mod_url_get_urls_by_courses", "");
+    for (int i = 0; i < MD_MOD_COUNT; ++i) {
+        md_client_write_url(client, urls[courses.len + i], mdModList[i].parseWsfunction, "");
+    }
 
     char *urlArray[count];
     for (int i = 0; i < count; ++i)
@@ -374,36 +384,19 @@ void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError 
 
     char **results = http_get_multi_request(urlArray, count, error);
 
-    if (results) {
+    if (!*error) {
         for (int i = 0; i < courses.len && (!*error); ++i) {
-            if (results[i]) {
-                MDError err = MD_ERR_NONE;
-                json_value *topics = md_parse_moodle_json(results[i], &err);
-                if (!err) {
-                    MD_ARR(courses, MDCourse)[i].topics = md_parse_topics(topics, &err);
-                    if (err)
-                        *error = err;
-                    json_value_free(topics);
-                } else {
-                    *error = err;
-                }
+            json_value *topics = md_parse_moodle_json(results[i], error);
+            if (!*error) {
+                MD_ARR(courses, MDCourse)[i].topics = md_parse_topics(topics, error);
             }
+            json_value_free(topics);
         }
-        char *assignmentsData = results[count - MD_MOD_ASSIGNMENT];
-        if (assignmentsData && !*error) {
-            md_client_courses_set_mod_assignment_data(client, courses, assignmentsData, error);
-        }
-        char *workshopsData = results[count - MD_MOD_WORKSHOP];
-        if (workshopsData && !*error) {
-            md_client_courses_set_mod_workshop_data(client, courses, workshopsData, error);
-        }
-        char *resourcesData = results[count - MD_MOD_RESOURCE];
-        if (resourcesData && !*error) {
-            md_client_courses_set_mod_resource_data(client, courses, resourcesData, error);
-        }
-        char *urlsData = results[count - MD_MOD_URL];
-        if (urlsData && !*error) {
-            md_client_courses_set_mod_url_data(client, courses, urlsData, error);
+        for (int i = 0; i < MD_MOD_COUNT && (!*error); ++i) {
+            json_value *json = md_parse_moodle_json(results[courses.len + i], error);
+            if (!*error)
+                mdModList[i].parseFunc(client, courses, json, error);
+            json_value_free(json);
         }
         for (int i = 0; i < count; ++i)
             free(results[i]);
@@ -541,19 +534,31 @@ void md_client_mod_workshop_submit(MDClient *client,
     json_value_free(json);
 }
 
-MDModule *md_course_locate_module(MDCourse course, int instance, int id, MDError *error) {
+MDModule *md_courses_locate_module(MDArray courses, int courseId, int moduleId, int instance, MDError *error) {
     // TODO: optimize for log n lookup
-    for (int i = 0; i < course.topics.len; ++i) {
-        MDTopic topic = MD_ARR(course.topics, MDTopic)[i];
-        for (int j = 0; j < topic.modules.len; ++j) {
-            MDModule *module = &MD_ARR(topic.modules, MDModule)[j];
-            if (module->instance == instance && module->id == id) {
-                return module;
+    for (int i = 0; i < courses.len; ++i) {
+        MDCourse *course = &MD_COURSES(courses)[i];
+        if (course->id != courseId)
+            continue;
+        for (int j = 0; j < course->topics.len; ++j) {
+            MDTopic *topic = &MD_TOPICS(course->topics)[j];
+            for (int k = 0; k < topic->modules.len; ++k) {
+                MDModule *module = &MD_MODULES(topic->modules)[k];
+                if (module->instance == instance && module->id == moduleId) {
+                    return module;
+                }
             }
         }
     }
     *error = MD_ERR_MISMACHING_MOODLE_DATA;
     return NULL;
+}
+
+MDModule *md_courses_locate_json_module(MDArray courses, json_value *json, cchar *moduleIdJsonName, MDError *error) {
+    int courseId = json_get_integer(json, "course", error);
+    int moduleId = json_get_integer(json, moduleIdJsonName, error);
+    int instance = json_get_integer(json, "id", error);
+    return *error ? NULL : md_courses_locate_module(courses, courseId, moduleId, instance, error);
 }
 
 MDArray md_parse_files(json_value *jsonFiles, MDError *error) {
@@ -591,41 +596,16 @@ void md_parse_mod_assignment_plugins(json_value *configs, MDModAssignment *assig
     }
 }
 
-void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, char *data, MDError *error) {
-    json_value *json = md_parse_moodle_json(data, error);
-    if (*error)
-        return;
+void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, json_value *json, MDError *error) {
     json_value *jsonCourses = json_get_array(json, "courses", error);
     if (!*error) {
         for (int i = 0; i < jsonCourses->u.array.length; ++i) {
-            json_value *jsonCourse = jsonCourses->u.array.values[i];
-            int courseId = json_get_integer(jsonCourse, "id", error);
-            if (*error)
-                break;
-            int index = -1;
-            for (int j = 0; j < courses.len && index < 0; ++j) {
-                // Hoping that the order of preloaded courses and assignment courses is the same;
-                if (MD_ARR(courses, MDCourse)[(i + j) % courses.len].id == courseId) {
-                    index = (i + j) % courses.len;
-                }
-            }
-            if (index < 0) {
-                // TODO: check if this is actually not a topics course
-                continue;
-            }
-            MDCourse course = MD_ARR(courses, MDCourse)[index];
-            json_value *jsonAssignments = json_get_array(jsonCourse, "assignments", error);
-            if (*error)
-                break;
+            json_value *jsonAssignments = json_get_array(jsonCourses->u.array.values[i], "assignments", error);
 
             // Parse the actual assignment details.
             for (int j = 0; j < jsonAssignments->u.array.length && (!*error); ++j) {
                 json_value *jsonAssignment = jsonAssignments->u.array.values[j];
-                int instance = json_get_integer(jsonAssignment, "id", error);
-                int moduleId = json_get_integer(jsonAssignment, "cmid", error);
-                if (*error)
-                    break;
-                MDModule *module = md_course_locate_module(course, instance, moduleId, error);
+                MDModule *module = md_courses_locate_json_module(courses, jsonAssignment, "cmid", error);
                 if (*error)
                     break;
                 module->type = MD_MOD_ASSIGNMENT;
@@ -644,38 +624,14 @@ void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses
             }
         }
     }
-    json_value_free(json);
 }
 
-void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, char *data, MDError *error) {
-    json_value *json = md_parse_moodle_json(data, error);
-    if (*error)
-        return;
+void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, json_value *json, MDError *error) {
     json_value *jsonWorkshops = json_get_array(json, "workshops", error);
     if (!*error) {
         for (int i = 0; i < jsonWorkshops->u.array.length; ++i) {
             json_value *jsonWorkshop = jsonWorkshops->u.array.values[i];
-            int courseId = json_get_integer(jsonWorkshop, "course", error);
-            if (*error)
-                break;
-            int index = -1;
-            for (int j = 0; j < courses.len && index < 0; ++j) {
-                // Hoping that the order of preloaded courses and workshop courses is the same
-                if (MD_ARR(courses, MDCourse)[(i + j) % courses.len].id == courseId) {
-                    index = (i + j) % courses.len;
-                }
-            }
-            if (index < 0) {
-                // TODO: check if this is actualy not a topics course
-                continue;
-            }
-            MDCourse course = MD_ARR(courses, MDCourse)[index];
-
-            int instance = json_get_integer(jsonWorkshop, "id", error);
-            int moduleId = json_get_integer(jsonWorkshop, "coursemodule", error);
-            if (*error)
-                break;
-            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
+            MDModule *module = md_courses_locate_json_module(courses, jsonWorkshop, "coursemodule", error);
             if (*error)
                 break;
             module->type = MD_MOD_WORKSHOP;
@@ -699,38 +655,14 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             }
         }
     }
-    json_value_free(json);
 }
 
-void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, char *data, MDError *error) {
-    json_value *json = md_parse_moodle_json(data, error);
-    if (*error)
-        return;
+void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, json_value *json, MDError *error) {
     json_value *jsonResources = json_get_array(json, "resources", error);
     if (!*error) {
         for (int i = 0; i < jsonResources->u.array.length; ++i) {
             json_value *jsonResource = jsonResources->u.array.values[i];
-            int courseId = json_get_integer(jsonResource, "course", error);
-            if (*error)
-                break;
-            int index = -1;
-            for (int j = 0; j < courses.len && index < 0; ++j) {
-                // Hoping that the order of preloaded courses and workshop courses is the same
-                if (MD_ARR(courses, MDCourse)[(i + j) % courses.len].id == courseId) {
-                    index = (i + j) % courses.len;
-                }
-            }
-            if (index < 0) {
-                // TODO: check if this is actualy not a topics course
-                continue;
-            }
-            MDCourse course = MD_ARR(courses, MDCourse)[index];
-
-            int instance = json_get_integer(jsonResource, "id", error);
-            int moduleId = json_get_integer(jsonResource, "coursemodule", error);
-            if (*error)
-                break;
-            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
+            MDModule *module = md_courses_locate_json_module(courses, jsonResource, "coursemodule", error);
             if (*error)
                 break;
             module->type = MD_MOD_RESOURCE;
@@ -742,38 +674,14 @@ void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, 
                 resource->files = md_parse_files(jsonFiles, error);
         }
     }
-    json_value_free(json);
 }
 
-void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, char *data, MDError *error) {
-    json_value *json = md_parse_moodle_json(data, error);
-    if (*error)
-        return;
+void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, json_value *json, MDError *error) {
     json_value *jsonUrls = json_get_array(json, "urls", error);
     if (!*error) {
         for (int i = 0; i < jsonUrls->u.array.length; ++i) {
             json_value *jsonUrl = jsonUrls->u.array.values[i];
-            int courseId = json_get_integer(jsonUrl, "course", error);
-            if (*error)
-                break;
-            int index = -1;
-            for (int j = 0; j < courses.len && index < 0; ++j) {
-                // Hoping that the order of preloaded courses and workshop courses is the same
-                if (MD_ARR(courses, MDCourse)[(i + j) % courses.len].id == courseId) {
-                    index = (i + j) % courses.len;
-                }
-            }
-            if (index < 0) {
-                // TODO: check if this is actualy not a topics course
-                continue;
-            }
-            MDCourse course = MD_ARR(courses, MDCourse)[index];
-
-            int instance = json_get_integer(jsonUrl, "id", error);
-            int moduleId = json_get_integer(jsonUrl, "coursemodule", error);
-            if (*error)
-                break;
-            MDModule *module = md_course_locate_module(course, instance, moduleId, error);
+            MDModule *module = md_courses_locate_json_module(courses, jsonUrl, "coursemodule", error);
             if (*error)
                 break;
             module->type = MD_MOD_URL;
@@ -784,7 +692,6 @@ void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, char 
             url->url = json_get_string(jsonUrl, "externalurl", error);
         }
     }
-    json_value_free(json);
 }
 
 void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDError *error) {
