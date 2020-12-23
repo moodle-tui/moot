@@ -3,6 +3,7 @@
 .vscode
 moodle/test/test
 moot
+.ccls
 
 # Prerequisites
 *.d

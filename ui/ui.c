@@ -95,82 +95,117 @@ void printMenu(MDArray courses, MenuInfo *menuInfo, int maxHeight) {
     MDArray modules = MD_TOPICS(topics)[menuInfo->HLOptions[1]].modules;
     MDModResource resource;
     int height;
+    char *name;
+
+    int i = 0;
+    char msg[1000];
 
     for (height = 0; height < maxHeight; ++height) {
-        int depthIndex = -2;
-        addOption(" ", menuInfo, ++depthIndex, 0); // first empty options column
-        addMDArrayOption(courses, menuInfo, height, ++depthIndex);
-        addMDArrayOption(topics, menuInfo, height, ++depthIndex);
-        addMDArrayOption(modules, menuInfo, height, ++depthIndex);
-
-        if (modules.len > 0 && MD_MODULES(modules)[menuInfo->HLOptions[2]].type == MD_MOD_RESOURCE) {
-            if (height == 0)
-                addOption("Files", menuInfo, ++depthIndex, menuInfo->HLOptions[3] == height);
-            else
-                addOption("", menuInfo, ++depthIndex, 0);
-
-            resource = MD_MODULES(modules)[menuInfo->HLOptions[2]].contents.resource;
-            if (resource.files.len > height) {
-                addOption(MD_FILES(resource.files)[height].filename, menuInfo, ++depthIndex,
-                          menuInfo->HLOptions[4] == height);
-                if (menuInfo->depth == depthIndex) {
-                    menuInfo->isCurrentFile = 1;
-                }
-                else
-                    menuInfo->isCurrentFile = 0;
+        for (Depth depthIndex = INIT_DEPTH; depthIndex <= MAX_DEPTH; ++depthIndex) {
+            if (filterDepth(depthIndex, menuInfo->depth) == -1)
+                continue;
+            _Bool isHighlighted = menuInfo->HLOptions[depthIndex] == height;
+            switch (depthIndex) {
+                case INIT_DEPTH:
+                    addOption(" ", menuInfo, depthIndex, 0); // first empty options column
+                    break;
+                case COURSES_DEPTH:
+                    name = getMDArrayName(courses, height, depthIndex);
+                    addOption(name, menuInfo, depthIndex, isHighlighted);
+                    break;
+                case TOPICS_DEPTH:
+                    name = getMDArrayName(topics, height, depthIndex);
+                    addOption(name, menuInfo, depthIndex, isHighlighted);
+                    break;
+                case MODULES_DEPTH:
+                    name = getMDArrayName(modules, height, depthIndex);
+                    addOption(name, menuInfo, depthIndex, isHighlighted);
+                    break;
+                case MODULE_CONTENTS_DEPTH1:
+                    addModuleContentsOptions(modules, menuInfo, &depthIndex, height);
+                    break;
+                default:
+                    sprintf(msg, "Empty options: %d", i);
+                    addOption("", menuInfo, depthIndex, 0);
+                    break;
             }
-            else
-                addOption("", menuInfo, ++depthIndex, 0);
         }
-        else {
-            addOption("", menuInfo, ++depthIndex, 0);
-            addOption("", menuInfo, ++depthIndex, 0);
-        }
-        addOption("", menuInfo, ++depthIndex, 0);
         printf("\n");
     }
 
     clean(tcols(), trows() - height - 1);
 }
 
-void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int depthIndex) {
+char *getMDArrayName(MDArray mdArray, int height, int depthIndex) {
     char *name;
-    if (mdArray.len > heightIndex) {
-        name = getMDArrayName(mdArray, heightIndex, depthIndex);
+    if (mdArray.len > height) {
+        switch (depthIndex) {
+            case 0:
+                name = MD_COURSES(mdArray)[height].name;
+                break;
+            case 1:
+                name = MD_TOPICS(mdArray)[height].name;
+                break;
+            case 2:
+                name = MD_MODULES(mdArray)[height].name;
+                break;
+            default:
+                printErr("Wrong depth index\n");
+        }
     }
     else {
-        if (heightIndex == 0)
+        if (height == 0)
             name = EMPTY_OPTION_NAME;
         else
             name = " ";
     }
-
-    addOption(name, menuInfo, depthIndex,
-              menuInfo->HLOptions[depthIndex] == heightIndex);
+    return name;
 }
 
-char *getMDArrayName(MDArray mdArray, int heightIndex, int depthIndex) {
-    char *name;
-    switch (depthIndex) {
-    case 0:
-        name = MD_COURSES(mdArray)[heightIndex].name;
-        break;
-    case 1:
-        name = MD_TOPICS(mdArray)[heightIndex].name;
-        break;
-    case 2:
-        name = MD_MODULES(mdArray)[heightIndex].name;
-        break;
-    default:
-        printErr("Wrong option index\n");
+void addModuleContentsOptions(MDArray modules, MenuInfo *menuInfo, int *depthIndex, int height) {
+    MDModResource resource;
+    MDModType moduleType = MD_MODULES(modules)[menuInfo->HLOptions[MODULES_DEPTH]].type;
+
+    if (modules.len > 0 && moduleType == MD_MOD_RESOURCE) {
+        for (; *depthIndex < MAX_DEPTH; ++*depthIndex) {
+            _Bool isHighlighted = height == menuInfo->HLOptions[*depthIndex];
+            if (filterDepth(*depthIndex, menuInfo->depth) == -1)
+                continue;
+            resource = MD_MODULES(modules)[menuInfo->HLOptions[MODULES_DEPTH]].contents.resource;
+            switch (*depthIndex) {
+                case 3:
+                    switch (height) {
+                        case 0:
+                            addOption("Files", menuInfo, *depthIndex, isHighlighted);
+                            break;
+                        default:
+                            addOption("", menuInfo, *depthIndex, 0);
+                    }
+                    break;
+                case 4:
+                    if (resource.files.len > height)
+                        addOption(MD_FILES(resource.files)[height].filename, menuInfo, *depthIndex,
+                                isHighlighted);
+                    break;
+            }
+        }
+        --*depthIndex;
     }
-    return name;
+    else
+        addOption("", menuInfo, *depthIndex, 0);
+}
+
+int filterDepth(int optionDepth, int depth) {
+    if (optionDepth - depth >= -1 && optionDepth - depth <= 1) {
+        return 0;
+    }
+    return -1;
 }
 
 void addOption(char *name, MenuInfo *menuInfo, int optionDepth, _Bool isHighlighted) {
     int widthIndex = optionDepth - menuInfo->depth + 1;
-    if (widthIndex < 0 || widthIndex > 2)
-        return;
+    //if (widthIndex < 0 || widthIndex > 2)
+    //    return;
 
     if (widthIndex == 1 || widthIndex == 2)
         printf("%s", SEPERATOR);

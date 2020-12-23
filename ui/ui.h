@@ -5,10 +5,19 @@
 #define EMPTY_OPTION_NAME "[empty]"
 #define OPTION_CUT_STR "~"
 #define SEPERATOR "  "
-#define MAX_DEPTH 5
 #define DOWNLOAD_STARTED_MSG_COLOR BLUE
 #define DOWNLOAD_FINISHED_MSG_COLOR GREEN
 #define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
+
+typedef enum Depth {
+    INIT_DEPTH = -1,
+    COURSES_DEPTH = 0,
+    TOPICS_DEPTH = 1,
+    MODULES_DEPTH = 2,
+    MODULE_CONTENTS_DEPTH1 = 3,
+    MODULE_CONTENTS_DEPTH2 = 4,
+    MAX_DEPTH = 5,
+} Depth;
 
 typedef enum Action {
     ACTION_INVALID = 0,
@@ -47,6 +56,10 @@ void printMenu(MDArray courses, MenuInfo *menuInfo, int height);
 void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int depthIndex);
 
 char *getMDArrayName(MDArray mdArray, int heightIndex, int depthIndex);
+
+void addModuleContentsOptions(MDArray modules, MenuInfo *menuInfo, int *depthIndex, int height);
+
+int filterDepth(int optionDepth, int depth);
 
 // add option checks if option is visible and if it is, prints it as highlighted option or just
 // option, depending on whether isHighlighted equals true
