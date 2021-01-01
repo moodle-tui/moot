@@ -46,11 +46,11 @@ To use the app put token in `.token` file in executable directory, and run the e
 You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
 where the middle column is the current column you are navigating in.
 
-### Keys
-Theys are keys and actions, that moot interface currently supports. More comming soon.
+### Keybindings and actions
+These are keybindings and actions, that moot interface currently supports. More comming soon.
 - To move around, us the arrow keys or vim equivalents (`h`, `j`, `k`, `l`).
 - To quit, press `q`.
-- To download a file simply hover it and press enter or right arrow key. It will be downloaded to the location of the executable.
+- To download a file, hover it and press `s`. You will get a succes message in bottom left, when download is completed.
 
 ## Installing
 Currently we don't provide any prebuilt binaries, so one has to build for himself and put the final executable in [path](https://en.wikipedia.org/wiki/PATH_(variable))

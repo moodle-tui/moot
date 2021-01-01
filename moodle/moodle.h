@@ -2,15 +2,21 @@
 #define __MOODLE_H
 
 /*
- * Copyright (C) 2020 Nojus Gudinavičius
- * nojus.gudinavicius@gmail.com
+ * Copyright (C) 2020 Nojus Gudinavičius nojus.gudinavicius@gmail.com
  * https://github.com/moodle-tui/moot
- * 
- * Moodle SDK
- * This is a heavily simplified and minimized Moodle SDK interacting through
- * Moodle webservice api. Built for and tested with moodle 3.1.
+ *
+ * Moodle SDK. This is a heavily simplified and minimized Moodle SDK interacting
+ * through Moodle webservice api. Built for and tested with moodle 3.1.
  * https://docs.moodle.org/310/en/Web_services
  *
+ * An example of use can be found in subfolder test. However, the example there
+ * is more focused on testing the library, rather than displaying it's
+ * capabilities (e. g. header internal.h should not be included by a user of
+ * this library).
+ *
+ * Another example is the code in folder ui, which is a more complicated example
+ * of how this library can be used to make an user interface, developed by
+ * Ramojus Lapinskas.
 */
 
 
@@ -80,12 +86,14 @@ typedef struct MDClient {
 // never be returned, as unsuported modules are simply skipped when fetching
 // courses.
 typedef enum MDModType {
-    MD_MOD_UNSUPPORTED,
-    MD_MOD_ASSIGNMENT = 1,
-    MD_MOD_WORKSHOP = 2,
-    MD_MOD_RESOURCE = 3,
-    MD_MOD_URL = 4,
+    MD_MOD_ASSIGNMENT,
+    MD_MOD_WORKSHOP,
+    MD_MOD_RESOURCE,
+    MD_MOD_URL,
+    MD_MOD_UNSUPPORTED, // Must be the last entry.
 } MDModType;
+
+#define MD_MOD_COUNT MD_MOD_UNSUPPORTED
 
 // MDTextFormat contains avaiable moodle text formats. HTML is used ussualy though.
 typedef enum MDTextFormat {

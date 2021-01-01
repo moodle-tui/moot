@@ -1,9 +1,10 @@
 # token file
 .token
 .vscode
+.ccls
+.ccls-cache
 moodle/test/test
 moot
-.ccls
 
 # Prerequisites
 *.d
