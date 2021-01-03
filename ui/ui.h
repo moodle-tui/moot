@@ -1,6 +1,8 @@
-#include "moodle.h"
 #ifndef UI_H
 #define UI_H
+
+#include <stdio.h>
+#include "moodle.h"
 
 #define EMPTY_OPTION_NAME "[empty]"
 #define OPTION_CUT_STR "~"
@@ -8,6 +10,7 @@
 #define DOWNLOAD_STARTED_MSG_COLOR BLUE
 #define DOWNLOAD_FINISHED_MSG_COLOR GREEN
 #define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
+#define NR_OF_WIDTHS 3
 
 typedef enum Depth {
     INIT_DEPTH = -1,
@@ -16,7 +19,7 @@ typedef enum Depth {
     MODULES_DEPTH = 2,
     MODULE_CONTENTS_DEPTH1 = 3,
     MODULE_CONTENTS_DEPTH2 = 4,
-    MAX_DEPTH = 5,
+    LAST_DEPTH = 5,
 } Depth;
 
 typedef enum Action {
@@ -38,32 +41,42 @@ typedef enum KeyDef {
     KD_QUIT,
 } KeyDef;
 
-typedef struct menuInfo {
-    int depth, *widths, HLOptions[MAX_DEPTH], currentMaxDepth, scrollOffset[MAX_DEPTH];
-    _Bool isCurrentFile;
-    MDClient *client;
-} MenuInfo;
+//typedef struct menuInfo {
+//    int depth, *widths, HLOptions[MAX_DEPTH], currentMaxDepth, scrollOffset[MAX_DEPTH];
+//    _Bool isCurrentFile;
+//    MDClient *client;
+//} MenuInfo;
+
+typedef struct optionCoordinates {
+    int height;
+    Depth depth;
+} OptionCoordinates;
+
+typedef struct Layout {
+    int heights[LAST_DEPTH], *widths;
+} Layout;
 
 // mainLoop prints all the information and reacts to user input, until user decides to quit
-void mainLoop (MDArray courses, MenuInfo *menuInfo);
+void mainLoop (MDArray courses, MDClient *client);
 
-// getHeights gets lengths of courses, topics and modules and returns addres to the firs one
-int *getHeights(MDArray courses, int *hl);
+// printMenu prints menu, saves height of current depth and returns menu size,
+// depth in it being the last visible depth
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth);
 
-void printMenu(MDArray courses, MenuInfo *menuInfo, int height);
+char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions);
 
-// addMDArrayOption gets mdArray option name, applies EMPTY_OPTION_NAME if needed and calls addOption
-void addMDArrayOption(MDArray mdArray, MenuInfo *menuInfo, int heightIndex, int depthIndex);
+_Bool checkIfHighlighted(char *name, int *highlightedOptions, OptionCoordinates printPos);
 
-char *getMDArrayName(MDArray mdArray, int heightIndex, int depthIndex);
+// getMDArrayName returns mdArray option name or EMPTY_OPTION_NAME
+char *getMDArrayName(MDArray mdArray, int height, int depthIndex);
 
-void addModuleContentsOptions(MDArray modules, MenuInfo *menuInfo, int *depthIndex, int height);
+char *getModuleContentName(MDArray modules, OptionCoordinates printPos, int *highlightedOptions);
 
 int filterDepth(int optionDepth, int depth);
 
 // add option checks if option is visible and if it is, prints it as highlighted option or just
 // option, depending on whether isHighlighted equals true
-void addOption(char *name, MenuInfo *menuInfo, int optionDepth, _Bool isHighlighted);
+void addOption(char *name, int optionDepth, _Bool isHighlighted, int widthIndex, int width);
 
 // printHighlightedOption changes colors, calls printOption, and resets the colors
 void printHighlightedOption(char *optionName, int width);
@@ -78,18 +91,18 @@ void printOption(char *optionName, int width);
 // in case.
 KeyDef getKeyDef(int key);
 
-Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef);
+Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth);
 
-void doAction(MenuInfo *menuInfo, MDArray courses, int nrOfOptions, Action action);
+void doAction(Action action, MDArray courses, MDClient *client, int nrOfOptions, int *highlightedOptions, int *depth);
 
 // following functions change some values, to navigate the menu
-void goRight(MenuInfo *menuInfo);
+void goRight(int *depth);
 void goDown(int *highlightedOption, int nrOfOptions);
-void goLeft(MenuInfo *menuInfo);
+void goLeft(int *depth, int *highlightedOptions);
 void goUp(int *highlightedOption, int nrOfOptions);
 
 // getMDFile returns currently highlighted mdFile
-MDFile getMDFile(MDArray courses, MenuInfo *menuInfo);
+MDFile getMDFile(MDArray courses, int *highlightedOptions);
 
 void downloadFile(MDFile mdFile, MDClient *client);
 
@@ -98,9 +111,9 @@ void clean (int width, int height);
 
 void printSpaces(int count);
 
-// getWidthsOfOptions get gets three different widths for menu layout, depending on how
+// getWidths get gets three different widths for menu layout, depending on how
 // much space is currently available in the terminal
-int *getWidthsOfOptions(int sepLength);
+int *getWidths(int sepLength);
 
 // getMax gets max value from array
 int getMax(int *array, int size);

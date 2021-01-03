@@ -38,15 +38,10 @@ int main() {
         printErr(msg);
         return 0;
     }
-    MenuInfo menuInfo = {
-        .HLOptions = {0},
-        .depth = 0,
-        .isCurrentFile = 0,
-        .client = client,
-    };
 
     hidecursor();
-    mainLoop(courseArr, &menuInfo);
+    cls();
+    mainLoop(courseArr, client);
     cls();
     showcursor();
 
@@ -56,84 +51,101 @@ int main() {
     curl_global_cleanup();
 }
 
-void mainLoop (MDArray courses, MenuInfo *menuInfo) {
+void mainLoop (MDArray courses, MDClient *client) {
     Action action;
+    int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
+    int prevHeight = 0;
 
     while (action != ACTION_QUIT) {
-        menuInfo->widths = getWidthsOfOptions(strlen(SEPERATOR));
-        int *heights = getHeights(courses, menuInfo->HLOptions);
-        int maxHeight = getMax(heights, 3);
-        int terminalHeight = trows() - 1;
-        if (maxHeight >= terminalHeight) {
-            maxHeight = terminalHeight - 1;
-        }
+        OptionCoordinates menuSize = { .height = 0, .depth = 0 };
+        int depthHeight;
 
         locate(0, 0);
-        menuInfo->currentMaxDepth = 0;
-        printMenu(courses, menuInfo, maxHeight);
+        menuSize = printMenu(courses, highlightedOptions, &depthHeight, depth);
+
+        if (prevHeight > menuSize.height)
+            clean(tcols(), prevHeight - menuSize.height);
+        prevHeight = menuSize.height;
 
         do {
             int key = getkey();
             KeyDef keyDef = getKeyDef(key);
-            action = getAction(courses, menuInfo, keyDef);
+            action = getAction(courses, keyDef, depth, menuSize.depth);
         } while (action == ACTION_INVALID);
 
-        doAction(menuInfo, courses, heights[menuInfo->depth], action);
+        doAction(action, courses, client, depthHeight, highlightedOptions, &depth);
     }
 }
 
-int *getHeights(MDArray courses, int *hl) {
-    int *heights = malloc(sizeof(int) * 3);
-    heights[0] = courses.len;
-    heights[1] = MD_COURSES(courses)[hl[0]].topics.len,
-    heights[2] = MD_TOPICS(MD_COURSES(courses)[hl[0]].topics)[hl[1]].modules.len;
-    return heights;
-}
-
-void printMenu(MDArray courses, MenuInfo *menuInfo, int maxHeight) {
-    MDArray topics = MD_COURSES(courses)[menuInfo->HLOptions[0]].topics;
-    MDArray modules = MD_TOPICS(topics)[menuInfo->HLOptions[1]].modules;
-    MDModResource resource;
-    int height;
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth) {
+    OptionCoordinates menuSize;
+    OptionCoordinates printPos;
+    menuSize.depth = 0;
+    *depthHeight = -1;
+    int *widths = getWidths(strlen(SEPERATOR));
     char *name;
+    int emptyRowOptions = 0;
+    int terminalHeight = trows() - 1;
 
-    int i = 0;
-    char msg[1000];
+    for (printPos.height = 0; emptyRowOptions < NR_OF_WIDTHS && printPos.height < terminalHeight; ++printPos.height) {
+        emptyRowOptions = 0;
+        for (printPos.depth = INIT_DEPTH + depth; printPos.depth < NR_OF_WIDTHS + depth - 1; ++printPos.depth) {
+            name = getName(courses, printPos, highlightedOptions);
 
-    for (height = 0; height < maxHeight; ++height) {
-        for (Depth depthIndex = INIT_DEPTH; depthIndex <= MAX_DEPTH; ++depthIndex) {
-            if (filterDepth(depthIndex, menuInfo->depth) == -1)
-                continue;
-            _Bool isHighlighted = menuInfo->HLOptions[depthIndex] == height;
-            switch (depthIndex) {
-                case INIT_DEPTH:
-                    addOption(" ", menuInfo, depthIndex, 0); // first empty options column
-                    break;
-                case COURSES_DEPTH:
-                    name = getMDArrayName(courses, height, depthIndex);
-                    addOption(name, menuInfo, depthIndex, isHighlighted);
-                    break;
-                case TOPICS_DEPTH:
-                    name = getMDArrayName(topics, height, depthIndex);
-                    addOption(name, menuInfo, depthIndex, isHighlighted);
-                    break;
-                case MODULES_DEPTH:
-                    name = getMDArrayName(modules, height, depthIndex);
-                    addOption(name, menuInfo, depthIndex, isHighlighted);
-                    break;
-                case MODULE_CONTENTS_DEPTH1:
-                    addModuleContentsOptions(modules, menuInfo, &depthIndex, height);
-                    break;
-                default:
-                    sprintf(msg, "Empty options: %d", i);
-                    addOption("", menuInfo, depthIndex, 0);
-                    break;
+            _Bool isHighlighted = checkIfHighlighted(name, highlightedOptions, printPos);
+            int widthIndex = printPos.depth - depth + 1;
+            int width = widths[widthIndex];
+            addOption(name, printPos.depth, isHighlighted, widthIndex, width);
+
+            if (!strcmp(name, "")) {
+                if (depth == printPos.depth && *depthHeight == -1) {
+                    *depthHeight = printPos.height;
+                }
+                ++emptyRowOptions;
             }
+            if (isHighlighted && menuSize.depth < printPos.depth)
+                menuSize.depth = printPos.depth;
         }
         printf("\n");
     }
+    menuSize.height = printPos.height;
+    return menuSize;
+}
 
-    clean(tcols(), trows() - height - 1);
+char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions) {
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[0]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[1]].modules;
+    char *name;
+    switch (printPos.depth) {
+        case COURSES_DEPTH:
+            name = getMDArrayName(courses, printPos.height, printPos.depth);
+            break;
+        case TOPICS_DEPTH:
+            name = getMDArrayName(topics, printPos.height, printPos.depth);
+            break;
+        case MODULES_DEPTH:
+            name = getMDArrayName(modules, printPos.height, printPos.depth);
+            break;
+        case MODULE_CONTENTS_DEPTH1:
+        case MODULE_CONTENTS_DEPTH2:
+            name = getModuleContentName(modules, printPos, highlightedOptions);
+            break;
+        default:
+            name = "";
+            break;
+    }
+    if (!strcmp(name, "") && printPos.height == 0 && printPos.depth != INIT_DEPTH
+            && printPos.depth != LAST_DEPTH)
+        name = EMPTY_OPTION_NAME;
+
+    return name;
+}
+
+_Bool checkIfHighlighted(char *name, int *highlightedOptions, OptionCoordinates printPos) {
+    if (!strcmp(name, "") || !strcmp(name, EMPTY_OPTION_NAME))
+        return 0;
+    else
+        return highlightedOptions[printPos.depth] == printPos.height;
 }
 
 char *getMDArrayName(MDArray mdArray, int height, int depthIndex) {
@@ -153,59 +165,40 @@ char *getMDArrayName(MDArray mdArray, int height, int depthIndex) {
                 printErr("Wrong depth index\n");
         }
     }
-    else {
-        if (height == 0)
-            name = EMPTY_OPTION_NAME;
-        else
-            name = " ";
-    }
+    else
+        name = "";
+
     return name;
 }
 
-void addModuleContentsOptions(MDArray modules, MenuInfo *menuInfo, int *depthIndex, int height) {
+char *getModuleContentName(MDArray modules, OptionCoordinates printPos, int *highlightedOptions) {
     MDModResource resource;
-    MDModType moduleType = MD_MODULES(modules)[menuInfo->HLOptions[MODULES_DEPTH]].type;
+    MDModType moduleType = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type;
 
     if (modules.len > 0 && moduleType == MD_MOD_RESOURCE) {
-        for (; *depthIndex < MAX_DEPTH; ++*depthIndex) {
-            _Bool isHighlighted = height == menuInfo->HLOptions[*depthIndex];
-            if (filterDepth(*depthIndex, menuInfo->depth) == -1)
-                continue;
-            resource = MD_MODULES(modules)[menuInfo->HLOptions[MODULES_DEPTH]].contents.resource;
-            switch (*depthIndex) {
-                case 3:
-                    switch (height) {
-                        case 0:
-                            addOption("Files", menuInfo, *depthIndex, isHighlighted);
-                            break;
-                        default:
-                            addOption("", menuInfo, *depthIndex, 0);
-                    }
-                    break;
-                case 4:
-                    if (resource.files.len > height)
-                        addOption(MD_FILES(resource.files)[height].filename, menuInfo, *depthIndex,
-                                isHighlighted);
-                    break;
-            }
+        resource = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource;
+        switch (printPos.depth) {
+            case MODULE_CONTENTS_DEPTH1:
+                switch (printPos.height) {
+                    case 0:
+                        return "files";
+                        break;
+                    default:
+                        return "";
+                }
+                break;
+            case MODULE_CONTENTS_DEPTH2:
+                if (resource.files.len > printPos.height)
+                    return MD_FILES(resource.files)[printPos.height].filename;
+                break;
+            default:
+                break;
         }
-        --*depthIndex;
     }
-    else
-        addOption("", menuInfo, *depthIndex, 0);
+    return "";
 }
 
-int filterDepth(int optionDepth, int depth) {
-    if (optionDepth - depth >= -1 && optionDepth - depth <= 1) {
-        return 0;
-    }
-    return -1;
-}
-
-void addOption(char *name, MenuInfo *menuInfo, int optionDepth, _Bool isHighlighted) {
-    int widthIndex = optionDepth - menuInfo->depth + 1;
-    //if (widthIndex < 0 || widthIndex > 2)
-    //    return;
+void addOption(char *name, int optionDepth, _Bool isHighlighted, int widthIndex, int width) {
 
     if (widthIndex == 1 || widthIndex == 2)
         printf("%s", SEPERATOR);
@@ -213,13 +206,11 @@ void addOption(char *name, MenuInfo *menuInfo, int optionDepth, _Bool isHighligh
     if (name == NULL) {
         printErr("Invalid option name. Expected string, got NULL");
     }
-    if (isHighlighted && strcmp(name, EMPTY_OPTION_NAME)) {
-        printHighlightedOption(name, menuInfo->widths[widthIndex]);
-        if (menuInfo->currentMaxDepth < optionDepth)
-            menuInfo->currentMaxDepth = optionDepth;
+    if (isHighlighted) {
+        printHighlightedOption(name, width);
     }
     else
-        printOption(name, menuInfo->widths[widthIndex]);
+        printOption(name, width);
 }
 
 void printHighlightedOption(char *optionName, int width) {
@@ -306,11 +297,11 @@ KeyDef getKeyDef(int key) {
     return keyDef;
 }
 
-Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef) {
+Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth) {
     Action action;
     switch (keyDef) {
         case KD_RIGHT:
-            if (menuInfo->depth < menuInfo->currentMaxDepth)
+            if (depth < currentMaxDepth)
                 action = ACTION_GO_RIGHT;
             else
                 action = ACTION_INVALID;
@@ -319,7 +310,7 @@ Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef) {
             action = ACTION_GO_DOWN;
             break;
         case KD_LEFT:
-            if (menuInfo->depth != 0)
+            if (depth != 0)
                 action = ACTION_GO_LEFT;
             else
                 action = ACTION_INVALID;
@@ -337,33 +328,32 @@ Action getAction(MDArray courses, MenuInfo *menuInfo, KeyDef keyDef) {
     return action;
 };
 
-void doAction(MenuInfo *menuInfo, MDArray courses, int nrOfOptions, Action action) {
-    int *highlightedOption = &menuInfo->HLOptions[menuInfo->depth];
+void doAction(Action action, MDArray courses, MDClient *client, int nrOfOptions, int *highlightedOptions, int *depth) {
     MDFile mdFile;
     switch (action) {
         case ACTION_GO_RIGHT:
-            goRight(menuInfo);
+            goRight(depth);
             break;
         case ACTION_GO_DOWN:
-            goDown(highlightedOption, nrOfOptions);
+            goDown(&highlightedOptions[*depth], nrOfOptions);
             break;
         case ACTION_GO_LEFT:
-            goLeft(menuInfo);
+            goLeft(depth, highlightedOptions);
             break;
         case ACTION_GO_UP:
-            goUp(highlightedOption, nrOfOptions);
+            goUp(&highlightedOptions[*depth], nrOfOptions);
             break;
         case ACTION_DOWNLOAD:
-            mdFile = getMDFile(courses, menuInfo);
-            downloadFile(mdFile, menuInfo->client);
+            mdFile = getMDFile(courses, highlightedOptions);
+            downloadFile(mdFile, client);
             break;
         default:
             break;
     }
 }
 
-void goRight(MenuInfo *menuInfo) {
-    ++menuInfo->depth;
+void goRight(int *depth) {
+    ++*depth;
 }
 
 void goDown(int *highlightedOption, int nrOfOptions) {
@@ -373,9 +363,9 @@ void goDown(int *highlightedOption, int nrOfOptions) {
         ++*highlightedOption;
 }
 
-void goLeft(MenuInfo *menuInfo) {
-    menuInfo->HLOptions[menuInfo->depth] = 0;
-    --menuInfo->depth;
+void goLeft(int *depth, int *highlightedOptions) {
+    highlightedOptions[*depth] = 0;
+    --*depth;
 }
 
 void goUp(int *highlightedOption, int nrOfOptions) {
@@ -385,17 +375,17 @@ void goUp(int *highlightedOption, int nrOfOptions) {
         --*highlightedOption;
 }
 
-MDFile getMDFile(MDArray courses, MenuInfo *menuInfo) {
-    MDArray topics = MD_COURSES(courses)[menuInfo->HLOptions[0]].topics;
-    MDArray modules = MD_TOPICS(topics)[menuInfo->HLOptions[1]].modules;
+MDFile getMDFile(MDArray courses, int *highlightedOptions) {
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[0]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[1]].modules;
     MDFile mdFile;
-    if (modules.len > 0 && MD_MODULES(modules)[menuInfo->HLOptions[2]].type == MD_MOD_RESOURCE) {
+    if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[2]].type == MD_MOD_RESOURCE) {
         MDModResource resource;
-        resource = MD_MODULES(modules)[menuInfo->HLOptions[2]].contents.resource;
-        mdFile = MD_FILES(resource.files)[menuInfo->HLOptions[4]];
+        resource = MD_MODULES(modules)[highlightedOptions[2]].contents.resource;
+        mdFile = MD_FILES(resource.files)[highlightedOptions[4]];
     }
     else
-        printErr("Couldn't get moodle file");
+        notifySmall("Couldn't get file", RED);
 
     return mdFile;
 }
@@ -422,8 +412,8 @@ void downloadFile(MDFile mdFile, MDClient *client) {
     }
 }
 
-int *getWidthsOfOptions(int sepLength) {
-    int *widthOfColumns = malloc(sizeof(int) * 3);
+int *getWidths(int sepLength) {
+    int *widthOfColumns = malloc(sizeof(int) * NR_OF_WIDTHS);
     int availableColumns = tcols();
     widthOfColumns[0] = (availableColumns / 6) - sepLength;
     widthOfColumns[1] = (availableColumns / 3) - sepLength;
