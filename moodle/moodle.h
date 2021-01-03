@@ -1,6 +1,3 @@
-#ifndef __MOODLE_H
-#define __MOODLE_H
-
 /*
  * Copyright (C) 2020 Nojus Gudinavičius nojus.gudinavicius@gmail.com
  * https://github.com/moodle-tui/moot
@@ -17,22 +14,18 @@
  * Another example is the code in folder ui, which is a more complicated example
  * of how this library can be used to make an user interface, developed by
  * Ramojus Lapinskas.
-*/
+ */
 
+#ifndef __MOODLE_H
+#define __MOODLE_H
 
 #include <time.h>
 #include "stdbool.h"
 
-#define DEBUG(var) \
-    printf("DBG: %s = ", #var); \
-    printf(_Generic( \
-        var, \
-        int: "%d", \
-        char *: "%s", \
-        const char *: "%s", \
-        default: "?" \
-    ), var); \
-    printf("\n"); \
+#define DEBUG(var)                                                                             \
+    printf("DBG: %s = ", #var);                                                                \
+    printf(_Generic(var, int : "%d", char * : "%s", const char * : "%s", time_t: "%ld", default : "?"), var); \
+    printf("\n");
 
 // MDArray is generic array. When accessing elements, it should be casted using
 // macro MD_ARR; E. g.: Array numbers = MD_MAKE_ARR(int, 1, 2, 3);
@@ -73,6 +66,9 @@ typedef struct MDArray {
 // MD_NO_FILE_LIMIT means that file count is not limited.
 #define MD_NO_FILE_LIMIT -1
 
+// MD_NO_WORD_LIMIT means that word count is not limited.
+#define MD_NO_WORD_LIMIT 0
+
 // MDClient represents a single user on moodle. All of the functions are based on it.
 // MDClient should not be created manually, instead use md_client_new.
 typedef struct MDClient {
@@ -83,14 +79,14 @@ typedef struct MDClient {
 } MDClient;
 
 // MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely
-// never be returned, as unsuported modules are simply skipped when fetching
+// never be returned, as unsupported modules are simply skipped when fetching
 // courses.
 typedef enum MDModType {
     MD_MOD_ASSIGNMENT,
     MD_MOD_WORKSHOP,
     MD_MOD_RESOURCE,
     MD_MOD_URL,
-    MD_MOD_UNSUPPORTED, // Must be the last entry.
+    MD_MOD_UNSUPPORTED,  // Must be the last entry.
 } MDModType;
 
 #define MD_MOD_COUNT MD_MOD_UNSUPPORTED
@@ -131,19 +127,39 @@ typedef struct MDFileSubmission {
     char *acceptedFileTypes;  // may be NULL if file types are not limited.
 } MDFileSubmission;
 
-typedef enum MDModAssignmentStatus {
-    MD_MOD_ASSIGNMENT_STATUS_NEW,
-    MD_MOD_ASSIGNMENT_STATUS_SUBMITTED,
-} MDModAssignmentStatus;
+// MDTextSubmission, if enabled, allows to submit single or multiple files.
+typedef struct MDTextSubmission {
+    MDSubmissionStatus status;
+    int wordLimit;  // Equal to MD_NO_WORD_LIMIT if not limited.
+} MDTextSubmission;
 
-typedef struct MDModAssignmentState {
-    MDModAssignmentStatus status;
-    
+// MDModAssignmentState notes the state of an assignment.
+typedef enum MDModAssignmentState {
+    MD_MOD_ASSIGNMENT_STATE_NEW,
+    MD_MOD_ASSIGNMENT_STATE_SUBMITTED,
 } MDModAssignmentState;
 
-typedef struct MDModWorkshopState {
+// MDModAssignmentStatus holds additional information about an assignment, such
+// as if the current user has submitted and what grade he received.
+typedef struct MDModAssignmentStatus {
+    MDModAssignmentState state;
+    time_t submitDate, gradeDate;  // May be equal to MD_DATE_NEVER.
+    MDArray submittedFiles;        // Array with elements of type MDFile.
+    MDRichText submittedText;
+    bool graded;
+    char *grade;
+    // TODO: add or move feedback?
+} MDModAssignmentStatus;
 
-} MDModWorkshopState;
+// MDModWorkshopStatus holds additional information about a workshop, currently
+// the user's submission if one exists.
+typedef struct MDModWorkshopStatus {
+    bool submitted;
+    char *title;
+    time_t submitDate;
+    MDArray submittedFiles;  // Array with elements of type MDFile.
+    MDRichText submittedText;
+} MDModWorkshopStatus;
 
 // MDModAssignment represents moodle assignment. Currently it only supports file submission, which
 // may be disabled.
@@ -153,6 +169,9 @@ typedef struct MDModAssignment {
     MDArray files;  // Array with elements of type MDFile.
 
     MDFileSubmission fileSubmission;
+    MDTextSubmission textSubmission;
+
+    MDModAssignmentStatus status; // needs to be loaded separately.
 } MDModAssignment;
 
 // MDModWorkshop represents moodle workshop. Currently it only supports file submission, which
@@ -162,8 +181,9 @@ typedef struct MDModWorkshop {
     bool lateSubmissions;      // Allows submitting after due date if true.
     MDRichText description, instructions;
 
-    bool textSubmissionRequired;
     MDFileSubmission fileSubmission;
+    MDTextSubmission textSubmission;
+    MDModWorkshopStatus status; // needs to be loaded separately.
 } MDModWorkshop;
 
 // MDModResource represents moodle resource. Files from it may be downloaded using md_client_download_file.
@@ -231,10 +251,25 @@ typedef enum MDError {
     MD_ERR_MISMACHING_MOODLE_DATA,
 } MDError;
 
-typedef MDArray MDFetchedStatus;
+// MDLoadedStatus is a type to hold preloaded module statuses using
+// md_courses_load_status. The information can be applied to courses array using
+// md_loaded_status_apply. This allows to perform status loading in the
+// background and then applying it thread-safe way.
+typedef struct MDLoadedStatus {
+    MDArray internalReferences;
+} MDLoadedStatus;
 
-MDFetchedStatus md_courses_fetch_status(MDClient *client, MDArray courses, MDError *error);
-void md_fetched_status_apply(MDFetchedStatus status);
+// md_courses_load_status loads statuses of modules in given courses (whether
+// it's submitted, graded, etc). The changes needs to be applied to courses
+// array using function md_loaded_status_apply. The result of a call to this
+// function can be freed using md_loaded_status_cleanup.
+MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error);
+
+// md_loaded_status_apply applies loaded changes.
+void md_loaded_status_apply(MDLoadedStatus status);
+
+// md_loaded_status_apply releases resources held by loaded changes.
+void md_loaded_status_cleanup(MDLoadedStatus status);
 
 // md_error_get_message returns the error message for an error;
 const char *md_error_get_message(MDError error);
@@ -242,7 +277,7 @@ const char *md_error_get_message(MDError error);
 // md_client_new creates and returns new MDClient.
 MDClient *md_client_new(char *token, char *website, MDError *error);
 
-// md_client_init initializes the client, which is requered for all further operations.
+// md_client_init initializes the client, which is required for all further operations.
 void md_client_init(MDClient *client, MDError *error);
 
 // md_client_cleanup releases all the resources owned by the client.
@@ -256,16 +291,21 @@ MDArray md_client_fetch_courses(MDClient *client, MDError *error);
 // @param courses MDArray with elements of type MDCourse.
 void md_courses_cleanup(MDArray courses);
 
-// md_client_mod_assign_submit submits an assignment module with given files.
-// @param filenames MDArray with elements of type const char *
-void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray filenames, MDError *error);
+// md_client_mod_assign_submit submits an assignment module with given files and
+// text. text or filename array may be NULL, in which case that part will not be
+// submitted.
+// @param filenames pointer to MDArray with elements of type const char *.
+void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray *filenames, MDRichText *text, MDError *error);
 
-// md_client_mod_workshop_submit submits a workshop module with given files.
+// md_client_mod_workshop_submit submits a workshop module with given files and
+// text. text or filename array may be NULL, in which case that part will not be
+// submitted.
 // @param filenames MDArray with elements of type const char *
 // @param title A string that may not be empty
 void md_client_mod_workshop_submit(MDClient *client,
                                    MDModule *workshop,
-                                   MDArray filenames,
+                                   MDArray *filenames,
+                                   MDRichText *text,
                                    const char *title,
                                    MDError *error);
 

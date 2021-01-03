@@ -41,6 +41,13 @@ struct Memblock {
     MDError *error;
 };
 
+// str_replace replaces all occurrences of needle with replacement in the given
+// string. Replacement must be no longer than the needle.
+void str_replace(char *str, cchar *needle, cchar *replacement);
+
+// url_escape escapes and returns text for use in urls.
+char *url_escape(cchar *url, MDError *error);
+
 // md_malloc allocates allocates memory and sets error on fail.
 void *md_malloc(size_t size, MDError *error);
 
@@ -82,21 +89,20 @@ int json_get_bool(json_value *json, cchar *key, MDError *error);
 char *json_get_string(json_value *json, cchar *key, MDError *error);
 cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error);
 json_value *json_get_array(json_value *json, cchar *key, MDError *error);
+json_value *json_get_object(json_value *json, cchar *key, MDError *error);
 
 // client.c
 
-typedef void (*MDParseFunc)(MDClient *client, MDArray courses, json_value *json, MDError *error);
-struct MDStateRef {
+typedef struct MDStatusRef {
     MDModule *module;
     union {
-        MDModWorkshopState workshop;
-        MDModAssignmentState assignment;
-    } state;
-};
+        MDModWorkshopStatus workshop;
+        MDModAssignmentStatus assignment;
+    } status;
+} MDStatusRef;
 
-typedef struct MDState {
-    
-} MDState;
+void md_mod_assign_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error);
+void md_mod_workshop_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error);
 
 // MDInitFunc is the callback called by md_array_init_new for each created element.
 typedef void (*MDInitFunc)(void *);
@@ -104,13 +110,20 @@ typedef void (*MDInitFunc)(void *);
 // MDInitFunc is the callback called by md_array_cleanup for each created element.
 typedef void (*MDCleanupFunc)(void *);
 
+typedef void (*MDParseFunc)(MDClient *client, MDArray courses, json_value *json, MDError *error);
+
+typedef void (*MDStatusParseFunc)(json_value *data, MDStatusRef *statusRef, MDError *error);
+
 typedef struct MDMod {
     MDModType type;
-    const char *name, *parseWsfunction;
+    cchar *name, *parseWsFunction;
+    cchar *statusWsFunction, *statusInstanceName;
     MDParseFunc parseFunc;
     MDInitFunc initFunc;
     MDCleanupFunc cleanupFunc;
+    MDStatusParseFunc statusParseFunc; // if NULL, it does not parse status.
 } MDMod;
+
 
 // md_array_init_new initializes given array, optionaly calling callback for each created element
 // (if callback isn't NULL). The array must be cleaned later up using md_array_cleanup.
@@ -120,11 +133,11 @@ void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callb
 // (if callback isn't NULL).
 void md_array_cleanup(MDArray *array, size_t size, MDCleanupFunc callback);
 
-// md_client_write_url formats url for Moodle webservice request.
-void md_client_write_url(MDClient *client, char *url, cchar *wsfunction, cchar *format, ...);
+// md_client_write_url formats url for Moodle webservice request and returns bytes written.
+int md_client_write_url(MDClient *client, char *url, cchar *wsfunction, cchar *format, ...);
 
 // same as md_client_write_url, but with va_list.
-void md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cchar *format, va_list args);
+int md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cchar *format, va_list args);
 
 // md_client_do_http_json_request makes a request to Moodle webservice to
 // specific function, caching Moodle exceptions.
@@ -173,6 +186,8 @@ void md_rich_text_init(MDRichText *richText);
 void md_rich_text_cleanup(MDRichText *richText);
 void md_file_submission_init(MDFileSubmission *submission);
 void md_file_submission_cleanup(MDFileSubmission *submission);
+void md_text_submission_init(MDTextSubmission *submission);
+void md_text_submission_cleanup(MDTextSubmission *submission);
 void md_file_init(MDFile *file);
 void md_file_cleanup(MDFile *file);
 
