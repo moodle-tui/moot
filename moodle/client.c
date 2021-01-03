@@ -21,32 +21,40 @@ MDMod mdModList[MD_MOD_COUNT] = {
     {
         .type = MD_MOD_ASSIGNMENT,
         .name = "assign",
-        .parseWsfunction = "mod_assign_get_assignments",
+        .parseWsFunction = "mod_assign_get_assignments",
         .parseFunc = md_client_courses_set_mod_assignment_data,
+        .statusWsFunction = "mod_assign_get_submission_status",
+        .statusInstanceName = "assignid",
+        .statusParseFunc = md_mod_assign_parse_status,
         .initFunc = (MDInitFunc)md_mod_assignment_init,
         .cleanupFunc = (MDCleanupFunc)md_mod_assignment_cleanup,
     },
     {
         .type = MD_MOD_WORKSHOP,
         .name = "workshop",
-        .parseWsfunction = "mod_workshop_get_workshops_by_courses",
+        .parseWsFunction = "mod_workshop_get_workshops_by_courses",
         .parseFunc = md_client_courses_set_mod_workshop_data,
+        .statusWsFunction = "mod_workshop_get_submissions",
+        .statusInstanceName = "workshopid",
+        .statusParseFunc = md_mod_workshop_parse_status,
         .initFunc = (MDInitFunc)md_mod_workshop_init,
         .cleanupFunc = (MDCleanupFunc)md_mod_workshop_cleanup,
     },
     {
         .type = MD_MOD_RESOURCE,
         .name = "resource",
-        .parseWsfunction = "mod_resource_get_resources_by_courses",
+        .parseWsFunction = "mod_resource_get_resources_by_courses",
         .parseFunc = md_client_courses_set_mod_resource_data,
+        .statusParseFunc = NULL,
         .initFunc = (MDInitFunc)md_mod_resource_init,
         .cleanupFunc = (MDCleanupFunc)md_mod_resource_cleanup,
     },
     {
         .type = MD_MOD_URL,
         .name = "url",
-        .parseWsfunction = "mod_url_get_urls_by_courses",
+        .parseWsFunction = "mod_url_get_urls_by_courses",
         .parseFunc = md_client_courses_set_mod_url_data,
+        .statusParseFunc = NULL,
         .initFunc = (MDInitFunc)md_mod_url_init,
         .cleanupFunc = (MDCleanupFunc)md_mod_url_cleanup,
     },
@@ -70,6 +78,7 @@ json_value *md_client_do_http_json_request(MDClient *client, MDError *error, cha
     md_client_write_url_varg(client, url, wsfunction, format, args);
     va_end(args);
 
+    // printf("<%s>\n", url);
     char *data = http_get_request(url, error);
     if (!data)
         return NULL;
@@ -78,18 +87,18 @@ json_value *md_client_do_http_json_request(MDClient *client, MDError *error, cha
     return json;
 }
 
-void md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cchar *format, va_list args) {
-    snprintf(url, MD_URL_LENGTH, "%s%s?" MD_WSTOKEN "=%s&%s&" MD_WSFUNCTION "=%s", client->website, MD_SERVICE_URL,
-             client->token, MD_PARAM_JSON, wsfunction);
-    size_t len = strlen(url);
-    vsnprintf(url + len, MD_URL_LENGTH - len, format, args);
+int md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cchar *format, va_list args) {
+    int len = snprintf(url, MD_URL_LENGTH, "%s%s?" MD_WSTOKEN "=%s&%s&" MD_WSFUNCTION "=%s", client->website,
+                       MD_SERVICE_URL, client->token, MD_PARAM_JSON, wsfunction);
+    return len + vsnprintf(url + len, MD_URL_LENGTH - len, format, args);
 }
 
-void md_client_write_url(MDClient *client, char *url, cchar *wsfunction, cchar *format, ...) {
+int md_client_write_url(MDClient *client, char *url, cchar *wsfunction, cchar *format, ...) {
     va_list args;
     va_start(args, format);
-    md_client_write_url_varg(client, url, wsfunction, format, args);
+    int len = md_client_write_url_varg(client, url, wsfunction, format, args);
     va_end(args);
+    return len;
 }
 
 void md_client_init(MDClient *client, MDError *error) {
@@ -221,6 +230,7 @@ void md_mod_assignment_init(MDModule *module) {
     assignment->fromDate = assignment->dueDate = assignment->cutOffDate = MD_DATE_NONE;
     md_rich_text_init(&assignment->description);
     md_file_submission_init(&assignment->fileSubmission);
+    md_text_submission_init(&assignment->textSubmission);
     md_array_init(&assignment->files);
 }
 
@@ -228,6 +238,7 @@ void md_mod_assignment_cleanup(MDModule *module) {
     MDModAssignment *assignment = &module->contents.assignment;
     md_rich_text_cleanup(&assignment->description);
     md_file_submission_cleanup(&assignment->fileSubmission);
+    md_text_submission_cleanup(&assignment->textSubmission);
     md_array_cleanup(&assignment->files, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
 }
 
@@ -238,6 +249,7 @@ void md_mod_workshop_init(MDModule *module) {
     md_rich_text_init(&workshop->instructions);
     workshop->lateSubmissions = false;
     md_file_submission_init(&workshop->fileSubmission);
+    md_text_submission_init(&workshop->textSubmission);
 }
 
 void md_mod_workshop_cleanup(MDModule *module) {
@@ -245,6 +257,7 @@ void md_mod_workshop_cleanup(MDModule *module) {
     md_rich_text_cleanup(&workshop->description);
     md_rich_text_cleanup(&workshop->instructions);
     md_file_submission_cleanup(&workshop->fileSubmission);
+    md_text_submission_cleanup(&workshop->textSubmission);
 }
 
 void md_mod_url_init(MDModule *module) {
@@ -290,6 +303,69 @@ void md_file_submission_init(MDFileSubmission *submission) {
 
 void md_file_submission_cleanup(MDFileSubmission *submission) {
     free(submission->acceptedFileTypes);
+}
+
+void md_text_submission_init(MDTextSubmission *submission) {
+    submission->status = MD_SUBMISSION_DISABLED;
+    submission->wordLimit = 0;
+}
+
+void md_text_submission_cleanup(MDTextSubmission *submission) {
+    //
+}
+
+void md_mod_assignment_status_init(MDModAssignmentStatus *status) {
+    status->grade = NULL;
+    md_rich_text_init(&status->submittedText);
+    md_array_init(&status->submittedFiles);
+}
+
+void md_mod_assignment_status_cleanup(MDModAssignmentStatus *status) {
+    free(status->grade);
+    md_rich_text_cleanup(&status->submittedText);
+    md_array_cleanup(&status->submittedFiles, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
+}
+
+void md_mod_workshop_status_init(MDModWorkshopStatus *status) {
+    status->title = NULL;
+    md_rich_text_init(&status->submittedText);
+    md_array_init(&status->submittedFiles);
+}
+
+void md_mod_workshop_status_cleanup(MDModWorkshopStatus *status) {
+    free(status->title);
+    md_rich_text_cleanup(&status->submittedText);
+    md_array_cleanup(&status->submittedFiles, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
+}
+
+void md_status_ref_init(MDStatusRef *status) {
+    switch (status->module->type) {
+        case MD_MOD_ASSIGNMENT:
+            md_mod_assignment_status_init(&status->status.assignment);
+            break;
+
+        case MD_MOD_WORKSHOP:
+            md_mod_workshop_status_init(&status->status.workshop);
+            break;
+
+        default:
+            break;
+    }
+}
+
+void md_status_ref_cleanup(MDStatusRef *status) {
+    switch (status->module->type) {
+        case MD_MOD_ASSIGNMENT:
+            md_mod_assignment_status_cleanup(&status->status.assignment);
+            break;
+
+        case MD_MOD_WORKSHOP:
+            md_mod_workshop_status_cleanup(&status->status.workshop);
+            break;
+
+        default:
+            break;
+    }
 }
 
 void md_file_init(MDFile *file) {
@@ -375,7 +451,7 @@ void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError 
                             MD_ARR(courses, MDCourse)[i].id);
     }
     for (int i = 0; i < MD_MOD_COUNT; ++i) {
-        md_client_write_url(client, urls[courses.len + i], mdModList[i].parseWsfunction, "");
+        md_client_write_url(client, urls[courses.len + i], mdModList[i].parseWsFunction, "");
     }
 
     char *urlArray[count];
@@ -481,21 +557,34 @@ cchar *md_find_moodle_warning(json_value *json) {
     return NULL;
 }
 
-void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray filenames, MDError *error) {
-    *error = assignment->type == MD_MOD_ASSIGNMENT ? MD_ERR_NONE : MD_ERR_MISUSED_MOODLE_API;
-    if (*error)
-        return;
-    long itemId = md_client_upload_files(client, filenames, error);
-    if (*error)
-        return;
-    // ignore submit text and comments for now.
+void md_client_mod_assign_submit(MDClient *client,
+                                 MDModule *assignment,
+                                 MDArray *filenames,
+                                 MDRichText *text,
+                                 MDError *error) {
+    *error = MD_ERR_NONE;
+    char params[MD_URL_LENGTH] = "";
+    int len = 0;
+    if (filenames) {
+        long itemId = md_client_upload_files(client, *filenames, error);
+        if (*error)
+            return;
+        len = snprintf(params + len, MD_URL_LENGTH - len, "&plugindata[files_filemanager]=%ld", itemId);
+    }
+    if (text) {
+        len = snprintf(params + len, MD_URL_LENGTH - len,
+                       "&plugindata[onlinetext_editor][text]=%s"
+                       "&plugindata[onlinetext_editor][format]=%d"
+                       "&plugindata[onlinetext_editor][itemid]=0",
+                       url_escape(text->text, error), text->format);
+        if (*error)
+            return;
+    }
     json_value *json = md_client_do_http_json_request(client, error, "mod_assign_save_submission",
                                                       "&assignmentid=%d"
-                                                      "&plugindata[files_filemanager]=%ld"
-                                                      "&plugindata[onlinetext_editor][text]="
-                                                      "&plugindata[onlinetext_editor][format]=4"
-                                                      "&plugindata[onlinetext_editor][itemid]=0",
-                                                      assignment->instance, itemId);
+                                                      "%s",
+                                                      assignment->instance, params);
+
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
         if (message) {
@@ -508,22 +597,32 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
 
 void md_client_mod_workshop_submit(MDClient *client,
                                    MDModule *workshop,
-                                   MDArray filenames,
+                                   MDArray *filenames,
+                                   MDRichText *text,
                                    cchar *title,
                                    MDError *error) {
-    *error = workshop->type == MD_MOD_WORKSHOP ? MD_ERR_NONE : MD_ERR_MISUSED_MOODLE_API;
-    long itemId = md_client_upload_files(client, filenames, error);
+    *error = MD_ERR_NONE;
+    char params[MD_URL_LENGTH] = "";
+    int len = 0;
+    if (filenames) {
+        long itemId = md_client_upload_files(client, *filenames, error);
+        if (*error)
+            return;
+        len = snprintf(params + len, MD_URL_LENGTH - len, "&attachmentsid=%ld", itemId);
+    }
+    if (text) {
+        len = snprintf(params + len, MD_URL_LENGTH - len, "&content=%s&contentformat=%d", url_escape(text->text, error),
+                       text->format);
+    }
+    title = url_escape(title, error);
     if (*error)
         return;
-    char content[2] = {0, 0};
-    if (workshop->contents.workshop.textSubmissionRequired)
-        content[0] = '-';
     json_value *json = md_client_do_http_json_request(client, error, "mod_workshop_add_submission",
                                                       "&workshopid=%d"
                                                       "&title=%s"
-                                                      "&content=%s"
-                                                      "&attachmentsid=%ld",
-                                                      workshop->instance, title, content, itemId);
+                                                      "%s",
+                                                      workshop->instance, title, params);
+    free((char *)title);
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
         if (message) {
@@ -592,6 +691,15 @@ void md_parse_mod_assignment_plugins(json_value *configs, MDModAssignment *assig
                 assignment->fileSubmission.acceptedFileTypes = clone_str(value, error);
             else if (strcmp(name, "maxsubmissionsizebytes") == 0)
                 assignment->fileSubmission.maxSubmissionSize = atoll(value);
+        } else if (strcmp(plugin, "onlinetext") == 0) {
+            cchar *name = json_get_string_no_alloc(config, "name", error);
+            cchar *value = json_get_string_no_alloc(config, "value", error);
+            if (*error)
+                break;
+            if (strcmp(name, "enabled") == 0)
+                assignment->textSubmission.status = !atoi(value) ? MD_SUBMISSION_DISABLED : MD_SUBMISSION_REQUIRED;
+            else if (strcmp(name, "wordlimit") == 0)
+                assignment->textSubmission.wordLimit = atoi(value);
         }
     }
 }
@@ -643,7 +751,8 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             workshop->description.format = json_get_integer(jsonWorkshop, "introformat", error);
             workshop->instructions.text = json_get_string(jsonWorkshop, "instructauthors", error);
             workshop->instructions.format = json_get_integer(jsonWorkshop, "instructauthorsformat", error);
-            workshop->textSubmissionRequired = json_get_integer(jsonWorkshop, "submissiontypetext", error);
+            workshop->textSubmission.status = json_get_integer(jsonWorkshop, "submissiontypetext", error);
+            workshop->textSubmission.wordLimit = MD_NO_WORD_LIMIT;
             workshop->fileSubmission.status = json_get_integer(jsonWorkshop, "submissiontypefile", error);
             if (workshop->fileSubmission.status != MD_SUBMISSION_DISABLED) {
                 workshop->fileSubmission.acceptedFileTypes =
@@ -699,4 +808,207 @@ void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDErr
     char url[MD_URL_LENGTH];
     snprintf(url, MD_URL_LENGTH, "%s?token=%s", file->url, client->token);
     http_get_request_to_file(url, stream, error);
+}
+
+MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error) {
+    *error = MD_ERR_NONE;
+    int count = 0;
+    for (int i = 0; i < courses.len; ++i) {
+        MDCourse *course = &MD_COURSES(courses)[i];
+        for (int j = 0; j < course->topics.len; ++j) {
+            MDTopic *topic = &MD_TOPICS(course->topics)[j];
+            for (int k = 0; k < topic->modules.len; ++k) {
+                MDModule *module = &MD_MODULES(topic->modules)[k];
+                if (mdModList[module->type].statusParseFunc) {
+                    ++count;
+                }
+            }
+        }
+    }
+    MDLoadedStatus result;
+    md_array_init_new(&result.internalReferences, sizeof(MDStatusRef), count, NULL, error);
+    char urls[count][MD_URL_LENGTH], *urlArray[count];
+    int index = 0;
+    if (*error)
+        return result;
+    for (int i = 0; i < courses.len; ++i) {
+        MDCourse *course = &MD_COURSES(courses)[i];
+        for (int j = 0; j < course->topics.len; ++j) {
+            MDTopic *topic = &MD_TOPICS(course->topics)[j];
+            for (int k = 0; k < topic->modules.len; ++k) {
+                MDModule *module = &MD_MODULES(topic->modules)[k];
+                if (mdModList[module->type].statusParseFunc) {
+                    MDStatusRef *statusRef = &MD_ARR(result.internalReferences, MDStatusRef)[index];
+                    statusRef->module = module;
+                    md_status_ref_init(statusRef);
+                    md_client_write_url(client, urls[index], mdModList[module->type].statusWsFunction, "&%s=%d",
+                                        mdModList[module->type].statusInstanceName, module->instance);
+                    urlArray[index] = urls[index];
+                    ++index;
+                }
+            }
+        }
+    }
+    char **data = http_get_multi_request(urlArray, count, error);
+    if (!*error) {
+        for (int i = 0; i < count && !*error; ++i) {
+            // printf("<%s>\n[%s]\n", urls[i], data[i]);
+            MDStatusRef *statusRef = &MD_ARR(result.internalReferences, MDStatusRef)[i];
+            json_value *json = md_parse_moodle_json(data[i], error);
+            if (!*error) {
+                mdModList[statusRef->module->type].statusParseFunc(json, statusRef, error);
+            }
+        }
+        for (int i = 0; i < count; ++i) {
+            free(data[i]);
+        }
+        free(data);
+    }
+    return result;
+}
+
+void md_parse_mod_assignment_status_plugins(json_value *configs, MDModAssignment *assignment, MDError *error) {
+    for (int i = 0; i < configs->u.array.length && (!*error); ++i) {
+        json_value *config = configs->u.array.values[i];
+        cchar *plugin = json_get_string_no_alloc(config, "plugin", error);
+        if (*error)
+            break;
+        if (strcmp(plugin, "file") == 0) {
+            cchar *name = json_get_string_no_alloc(config, "name", error);
+            cchar *value = json_get_string_no_alloc(config, "value", error);
+            if (*error)
+                break;
+            if (strcmp(name, "enabled") == 0)
+                assignment->fileSubmission.status = !atoi(value) ? MD_SUBMISSION_DISABLED : MD_SUBMISSION_REQUIRED;
+            else if (strcmp(name, "maxfilesubmissions") == 0)
+                assignment->fileSubmission.maxUploadedFiles = atoi(value);
+            else if (strcmp(name, "filetypeslist") == 0)
+                assignment->fileSubmission.acceptedFileTypes = clone_str(value, error);
+            else if (strcmp(name, "maxsubmissionsizebytes") == 0)
+                assignment->fileSubmission.maxSubmissionSize = atoll(value);
+        } else if (strcmp(plugin, "onlinetext") == 0) {
+            cchar *name = json_get_string_no_alloc(config, "name", error);
+            cchar *value = json_get_string_no_alloc(config, "value", error);
+            if (*error)
+                break;
+            if (strcmp(name, "enabled") == 0)
+                assignment->textSubmission.status = !atoi(value) ? MD_SUBMISSION_DISABLED : MD_SUBMISSION_REQUIRED;
+            else if (strcmp(name, "wordlimit") == 0)
+                assignment->textSubmission.wordLimit = atoi(value);
+        }
+    }
+}
+
+void md_mod_assign_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error) {
+    json_value *lastAttempt = json_get_object(json, "lastattempt", error);
+    if (*error)
+        return;
+    MDError dummy = MD_ERR_NONE;
+    json_value *submission = json_get_object(lastAttempt, "submission", &dummy);
+    if (dummy) {
+        dummy = MD_ERR_NONE;
+        // Threat team submissions the same way.
+        submission = json_get_object(lastAttempt, "teamsubmission", &dummy);
+    }
+    if (dummy) {
+        // Our best guess.
+        statusRef->status.assignment.state = MD_MOD_ASSIGNMENT_STATE_NEW;
+        return;
+    }
+    cchar *state = json_get_string_no_alloc(submission, "status", error);
+    if (*error)
+        return;
+    MDModAssignmentStatus *status = &statusRef->status.assignment;
+    status->state = !strcmp(state, "new") ? MD_MOD_ASSIGNMENT_STATE_NEW : MD_MOD_ASSIGNMENT_STATE_SUBMITTED;
+    if (status->state != MD_MOD_ASSIGNMENT_STATE_NEW) {
+        status->graded = json_get_bool(lastAttempt, "graded", error);
+        status->submitDate = json_get_integer(submission, "timecreated", error);
+        json_value *plugins = json_get_array(submission, "plugins", error);
+        if (!*error) {
+            for (int i = 0; i < plugins->u.array.length && !*error; ++i) {
+                cchar *type = json_get_string_no_alloc(plugins->u.array.values[i], "type", error);
+                if (*error)
+                    continue;
+                if (!strcmp(type, "file")) {
+                    json_value *fileareas = json_get_array(plugins->u.array.values[i], "fileareas", error);
+                    if (*error)
+                        continue;
+                    for (int j = 0; j < fileareas->u.array.length && !*error; ++j) {
+                        cchar *area = json_get_string_no_alloc(fileareas->u.array.values[j], "area", error);
+                        if (*error || strcmp(area, "submission_files"))
+                            continue;
+                        json_value *files = json_get_array(fileareas->u.array.values[j], "files", error);
+                        if (!*error) {
+                            md_array_cleanup(&status->submittedFiles, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
+                            status->submittedFiles = md_parse_files(files, error);
+                        }
+                    }
+                } else if (!strcmp(type, "onlinetext")) {
+                    json_value *editorfields = json_get_array(plugins->u.array.values[i], "editorfields", error);
+                    if (*error)
+                        continue;
+                    for (int j = 0; j < editorfields->u.array.length && !*error; ++j) {
+                        json_value *jsonField = editorfields->u.array.values[j];
+                        cchar *name = json_get_string_no_alloc(jsonField, "name", error);
+                        if (*error || strcmp(name, "onlinetext"))
+                            continue;
+                        md_rich_text_cleanup(&status->submittedText);
+                        status->submittedText.text = json_get_string(jsonField, "text", error);
+                        status->submittedText.format = json_get_integer(jsonField, "format", error);
+                        break;
+                    }
+                }
+            }
+        }
+        if (!*error && status->graded) {
+            json_value *feedback = json_get_object(json, "feedback", error);
+            if (!*error) {
+                status->grade = json_get_string(feedback, "gradefordisplay", error);
+                // printf("%s\n", status->grade);
+                str_replace(status->grade, "&nbsp;", " ");
+                status->gradeDate = json_get_integer(feedback, "gradeddate", error);
+            }
+        }
+    }
+}
+void md_mod_workshop_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error) {
+    json_value *submissions = json_get_array(json, "submissions", error);
+    if (*error)
+        return;
+    MDModWorkshopStatus *status = &statusRef->status.workshop;
+    status->submitted = submissions->u.array.length > 0;
+    if (status->submitted) {
+        json_value *submission = submissions->u.array.values[0];
+        status->submitDate = json_get_integer(submission, "timecreated", error);
+        status->title = json_get_string(submission, "title", error);
+        status->submittedText.text = json_get_string(submission, "content", error);
+        status->submittedText.format = json_get_integer(submission, "contentformat", error);
+        json_value *files = json_get_array(submission, "attachmentfiles", error);
+        if (!*error) {
+            status->submittedFiles = md_parse_files(files, error);
+        }
+    }
+}
+
+void md_loaded_status_apply(MDLoadedStatus status) {
+    for (int i = 0; i < status.internalReferences.len; ++i) {
+        MDStatusRef *statusRef = &MD_ARR(status.internalReferences, MDStatusRef)[i];
+        switch (statusRef->module->type)
+        {
+        case MD_MOD_ASSIGNMENT:
+            statusRef->module->contents.assignment.status = statusRef->status.assignment;
+            break;
+
+        case MD_MOD_WORKSHOP:
+            statusRef->module->contents.workshop.status = statusRef->status.workshop;
+            break;
+        
+        default:
+            break;
+        }
+    }
+}
+
+void md_loaded_status_cleanup(MDLoadedStatus status) {
+    md_array_cleanup(&status.internalReferences, sizeof(MDStatusRef), (MDCleanupFunc)md_status_ref_cleanup);
 }
