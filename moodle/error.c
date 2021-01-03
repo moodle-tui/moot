@@ -20,7 +20,7 @@ struct errorMsg {
     {MD_ERR_JSON, "Invalid input"},
     {MD_ERR_MOODLE_EXCEPTION, "Moodle returned exception: %s"},
     {MD_ERR_MISSING_JSON_KEY, "Missing json key: %s"},
-    {MD_ERR_INVALID_JSON_VALUE, "Invalid json value"},
+    {MD_ERR_INVALID_JSON_VALUE, "Invalid json value for key %s"},
     {MD_ERR_INVALID_JSON, "Invalid json stream"},
     {MD_ERR_HTTP_REQUEST_FAIL, "Http request failed: %s"},
     {MD_ERR_CURL_FAIL, "Curl library error"},

@@ -44,6 +44,29 @@ char *clone_str(cchar *s, MDError *error) {
 
 typedef size_t WriteCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
 
+char *url_escape(cchar *url, MDError *error) {
+    char *escaped = curl_escape(url, 0);
+    if (!escaped)
+        *error = MD_ERR_ALLOC;
+    return escaped;
+}
+
+void str_replace(char *str, cchar *needle, cchar *replacement) {
+    size_t matched = 0, offset = 0;
+    size_t lenNeedle = strlen(needle), lenReplacement = strlen(replacement), len = strlen(str);
+    if (lenReplacement > lenNeedle)
+        return;
+    for (size_t i = 0; i <= len; ++i) {
+        str[i - offset] = str[i];
+        matched = str[i - offset] == needle[matched] ? matched + 1 : 0;
+        if (matched == lenNeedle) {
+            memcpy(str + i - offset - matched + 1, replacement, lenReplacement);
+            offset += lenNeedle - lenReplacement;
+            matched = 0;
+        }
+    }
+}
+
 CURL *createCurl(cchar *url, void *data, WriteCallback callback, MDError *error) {
     CURL *handle = curl_easy_init();
     if (handle) {
@@ -222,6 +245,7 @@ json_value *json_get_property(json_value *json, cchar *key, json_type type, MDEr
         if (value->type != type) {
             *error = MD_ERR_INVALID_JSON_VALUE;
             value = NULL;
+            md_error_set_message(key);
         }
     } else {
         *error = MD_ERR_MISSING_JSON_KEY;
@@ -268,4 +292,8 @@ cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error) {
 
 json_value *json_get_array(json_value *json, cchar *key, MDError *error) {
     return json_get_property(json, key, json_array, error);
+}
+
+json_value *json_get_object(json_value *json, cchar *key, MDError *error) {
+    return json_get_property(json, key, json_object, error);
 }
