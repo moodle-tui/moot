@@ -101,6 +101,8 @@ void goDown(int *highlightedOption, int nrOfOptions);
 void goLeft(int *depth, int *highlightedOptions);
 void goUp(int *highlightedOption, int nrOfOptions);
 
+void resetNextDepth(int *highlightedOptions, int depth);
+
 // getMDFile returns currently highlighted mdFile
 MDFile getMDFile(MDArray courses, int *highlightedOptions);
 

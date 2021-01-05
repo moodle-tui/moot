@@ -113,8 +113,8 @@ OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depth
 }
 
 char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions) {
-    MDArray topics = MD_COURSES(courses)[highlightedOptions[0]].topics;
-    MDArray modules = MD_TOPICS(topics)[highlightedOptions[1]].modules;
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
     char *name;
     switch (printPos.depth) {
         case COURSES_DEPTH:
@@ -336,12 +336,15 @@ void doAction(Action action, MDArray courses, MDClient *client, int nrOfOptions,
             break;
         case ACTION_GO_DOWN:
             goDown(&highlightedOptions[*depth], nrOfOptions);
+            resetNextDepth(highlightedOptions, *depth);
             break;
         case ACTION_GO_LEFT:
+            resetNextDepth(highlightedOptions, *depth);
             goLeft(depth, highlightedOptions);
             break;
         case ACTION_GO_UP:
             goUp(&highlightedOptions[*depth], nrOfOptions);
+            resetNextDepth(highlightedOptions, *depth);
             break;
         case ACTION_DOWNLOAD:
             mdFile = getMDFile(courses, highlightedOptions);
@@ -364,7 +367,6 @@ void goDown(int *highlightedOption, int nrOfOptions) {
 }
 
 void goLeft(int *depth, int *highlightedOptions) {
-    highlightedOptions[*depth] = 0;
     --*depth;
 }
 
@@ -373,6 +375,11 @@ void goUp(int *highlightedOption, int nrOfOptions) {
         *highlightedOption = nrOfOptions - 1;
     else
         --*highlightedOption;
+}
+
+void resetNextDepth(int *highlightedOptions, int depth) {
+    if (depth < LAST_DEPTH - 1)
+        highlightedOptions[depth + 1] = 0;
 }
 
 MDFile getMDFile(MDArray courses, int *highlightedOptions) {
