@@ -55,13 +55,14 @@ void mainLoop (MDArray courses, MDClient *client) {
     Action action;
     int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
     int prevHeight = 0;
+    int scrollOffsets[LAST_DEPTH] = {0};
 
     while (action != ACTION_QUIT) {
         OptionCoordinates menuSize = { .height = 0, .depth = 0 };
         int depthHeight;
 
         locate(0, 0);
-        menuSize = printMenu(courses, highlightedOptions, &depthHeight, depth);
+        menuSize = printMenu(courses, highlightedOptions, &depthHeight, depth, scrollOffsets);
 
         if (prevHeight > menuSize.height)
             clean(tcols(), prevHeight - menuSize.height);
@@ -73,11 +74,11 @@ void mainLoop (MDArray courses, MDClient *client) {
             action = getAction(courses, keyDef, depth, menuSize.depth);
         } while (action == ACTION_INVALID);
 
-        doAction(action, courses, client, depthHeight, highlightedOptions, &depth);
+        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets);
     }
 }
 
-OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth) {
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth, int *scrollOffsets) {
     OptionCoordinates menuSize;
     OptionCoordinates printPos;
     menuSize.depth = 0;
@@ -90,7 +91,7 @@ OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depth
     for (printPos.height = 0; emptyRowOptions < NR_OF_WIDTHS && printPos.height < terminalHeight; ++printPos.height) {
         emptyRowOptions = 0;
         for (printPos.depth = INIT_DEPTH + depth; printPos.depth < NR_OF_WIDTHS + depth - 1; ++printPos.depth) {
-            name = getName(courses, printPos, highlightedOptions);
+            name = getName(courses, printPos, highlightedOptions, scrollOffsets);
 
             _Bool isHighlighted = checkIfHighlighted(name, highlightedOptions, printPos);
             int widthIndex = printPos.depth - depth + 1;
@@ -99,10 +100,13 @@ OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depth
 
             if (!strcmp(name, "")) {
                 if (depth == printPos.depth && *depthHeight == -1) {
-                    *depthHeight = printPos.height;
+                    *depthHeight = printPos.height - 1;
                 }
                 ++emptyRowOptions;
             }
+            else if (printPos.height == terminalHeight - 1 && *depthHeight == -1)
+                *depthHeight = terminalHeight;
+
             if (isHighlighted && menuSize.depth < printPos.depth)
                 menuSize.depth = printPos.depth;
         }
@@ -112,9 +116,10 @@ OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depth
     return menuSize;
 }
 
-char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions) {
+char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions, int *scrollOffsets) {
     MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
     MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
+    printPos.height += scrollOffsets[printPos.depth];
     char *name;
     switch (printPos.depth) {
         case COURSES_DEPTH:
@@ -247,7 +252,6 @@ void printOption(char *optionName, int width) {
         printedChWidth += charWidth;
         printedChSize += charSize;
     }
-
 }
 
 KeyDef getKeyDef(int key) {
@@ -328,23 +332,53 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth)
     return action;
 };
 
-void doAction(Action action, MDArray courses, MDClient *client, int nrOfOptions, int *highlightedOptions, int *depth) {
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
+    int height;
+    switch (depth) {
+        case COURSES_DEPTH:
+            height = courses.len;
+            break;
+        case TOPICS_DEPTH:
+            height = topics.len;
+            break;
+        case MODULES_DEPTH:
+            height = modules.len;
+            break;
+        case MODULE_CONTENTS_DEPTH1:
+            height = 0;
+        case MODULE_CONTENTS_DEPTH2:
+            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
+                height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
+            else
+                height = -1;
+            break;
+        default:
+            height = -1;
+    }
+    return height;
+}
+
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets) {
+    int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
     MDFile mdFile;
+    int maxHeight = trows() - 2;
     switch (action) {
         case ACTION_GO_RIGHT:
             goRight(depth);
             break;
         case ACTION_GO_DOWN:
-            goDown(&highlightedOptions[*depth], nrOfOptions);
-            resetNextDepth(highlightedOptions, *depth);
+            goDown(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
+            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
             break;
         case ACTION_GO_LEFT:
-            resetNextDepth(highlightedOptions, *depth);
+            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
             goLeft(depth, highlightedOptions);
             break;
         case ACTION_GO_UP:
-            goUp(&highlightedOptions[*depth], nrOfOptions);
-            resetNextDepth(highlightedOptions, *depth);
+            goUp(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
+            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
             break;
         case ACTION_DOWNLOAD:
             mdFile = getMDFile(courses, highlightedOptions);
@@ -359,27 +393,46 @@ void goRight(int *depth) {
     ++*depth;
 }
 
-void goDown(int *highlightedOption, int nrOfOptions) {
-    if (*highlightedOption == nrOfOptions - 1)
+void goDown(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
+    if (*highlightedOption + *scrollOffset == depthHeight) {
         *highlightedOption = 0;
-    else
-        ++*highlightedOption;
+        *scrollOffset = 0;
+    }
+    else {
+        if (*highlightedOption == maxHeight - SCROLLOFF
+                && *highlightedOption + *scrollOffset != depthHeight - SCROLLOFF)
+            ++*scrollOffset;
+        else
+            ++*highlightedOption;
+    }
 }
 
 void goLeft(int *depth, int *highlightedOptions) {
     --*depth;
 }
 
-void goUp(int *highlightedOption, int nrOfOptions) {
-    if (*highlightedOption == 0)
-        *highlightedOption = nrOfOptions - 1;
-    else
-        --*highlightedOption;
+void goUp(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
+    if (*highlightedOption + *scrollOffset == 0) {
+        if (depthHeight > maxHeight) {
+            *scrollOffset = depthHeight - maxHeight;
+            *highlightedOption = maxHeight;
+        }
+        else
+            *highlightedOption = depthHeight;
+    }
+    else {
+        if (*scrollOffset != 0 && *highlightedOption <= SCROLLOFF)
+            --*scrollOffset;
+        else
+            --*highlightedOption;
+    }
 }
 
-void resetNextDepth(int *highlightedOptions, int depth) {
-    if (depth < LAST_DEPTH - 1)
+void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets) {
+    if (depth < LAST_DEPTH - 1) {
         highlightedOptions[depth + 1] = 0;
+        scrollOffsets[depth + 1] = 0;
+    }
 }
 
 MDFile getMDFile(MDArray courses, int *highlightedOptions) {

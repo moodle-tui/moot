@@ -11,6 +11,7 @@
 #define DOWNLOAD_FINISHED_MSG_COLOR GREEN
 #define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
 #define NR_OF_WIDTHS 3
+#define SCROLLOFF 5
 
 typedef enum Depth {
     INIT_DEPTH = -1,
@@ -61,9 +62,9 @@ void mainLoop (MDArray courses, MDClient *client);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
-OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth);
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth, int *scrollOffsets);
 
-char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions);
+char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions, int *scrollOffsets);
 
 _Bool checkIfHighlighted(char *name, int *highlightedOptions, OptionCoordinates printPos);
 
@@ -93,15 +94,17 @@ KeyDef getKeyDef(int key);
 
 Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth);
 
-void doAction(Action action, MDArray courses, MDClient *client, int nrOfOptions, int *highlightedOptions, int *depth);
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
+
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets);
 
 // following functions change some values, to navigate the menu
 void goRight(int *depth);
-void goDown(int *highlightedOption, int nrOfOptions);
+void goDown(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
 void goLeft(int *depth, int *highlightedOptions);
-void goUp(int *highlightedOption, int nrOfOptions);
+void goUp(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
 
-void resetNextDepth(int *highlightedOptions, int depth);
+void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets);
 
 // getMDFile returns currently highlighted mdFile
 MDFile getMDFile(MDArray courses, int *highlightedOptions);
