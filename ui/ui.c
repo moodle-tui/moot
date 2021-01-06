@@ -58,31 +58,29 @@ void mainLoop (MDArray courses, MDClient *client) {
     int scrollOffsets[LAST_DEPTH] = {0};
 
     while (action != ACTION_QUIT) {
-        OptionCoordinates menuSize = { .height = 0, .depth = 0 };
-        int depthHeight;
-
+        OptionCoordinates menuSize;
         locate(0, 0);
-        menuSize = printMenu(courses, highlightedOptions, &depthHeight, depth, scrollOffsets);
+        menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
 
         if (prevHeight > menuSize.height)
             clean(tcols(), prevHeight - menuSize.height);
         prevHeight = menuSize.height;
 
+        int depthHeight = getDepthHeight(depth, courses, highlightedOptions);
         do {
             int key = getkey();
             KeyDef keyDef = getKeyDef(key);
-            action = getAction(courses, keyDef, depth, menuSize.depth);
+            action = getAction(courses, keyDef, depth, menuSize.depth, depthHeight);
         } while (action == ACTION_INVALID);
 
         doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets);
     }
 }
 
-OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth, int *scrollOffsets) {
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int depth, int *scrollOffsets) {
     OptionCoordinates menuSize;
     OptionCoordinates printPos;
     menuSize.depth = 0;
-    *depthHeight = -1;
     int *widths = getWidths(strlen(SEPERATOR));
     char *name;
     int emptyRowOptions = 0;
@@ -98,14 +96,8 @@ OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depth
             int width = widths[widthIndex];
             addOption(name, printPos.depth, isHighlighted, widthIndex, width);
 
-            if (!strcmp(name, "")) {
-                if (depth == printPos.depth && *depthHeight == -1) {
-                    *depthHeight = printPos.height - 1;
-                }
+            if (!strcmp(name, ""))
                 ++emptyRowOptions;
-            }
-            else if (printPos.height == terminalHeight - 1 && *depthHeight == -1)
-                *depthHeight = terminalHeight;
 
             if (isHighlighted && menuSize.depth < printPos.depth)
                 menuSize.depth = printPos.depth;
@@ -254,6 +246,34 @@ void printOption(char *optionName, int width) {
     }
 }
 
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
+    int height;
+    switch (depth) {
+        case COURSES_DEPTH:
+            height = courses.len;
+            break;
+        case TOPICS_DEPTH:
+            height = topics.len;
+            break;
+        case MODULES_DEPTH:
+            height = modules.len;
+            break;
+        case MODULE_CONTENTS_DEPTH1:
+            height = 1;
+        case MODULE_CONTENTS_DEPTH2:
+            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
+                height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
+            else
+                height = -1;
+            break;
+        default:
+            height = -1;
+    }
+    return height;
+}
+
 KeyDef getKeyDef(int key) {
     KeyDef keyDef;
     switch (key) {
@@ -301,7 +321,7 @@ KeyDef getKeyDef(int key) {
     return keyDef;
 }
 
-Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth) {
+Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight) {
     Action action;
     switch (keyDef) {
         case KD_RIGHT:
@@ -311,7 +331,10 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth)
                 action = ACTION_INVALID;
             break;
         case KD_DOWN:
-            action = ACTION_GO_DOWN;
+            if (depthHeight == 1)
+                action = ACTION_INVALID;
+            else 
+                action = ACTION_GO_DOWN;
             break;
         case KD_LEFT:
             if (depth != 0)
@@ -320,7 +343,10 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth)
                 action = ACTION_INVALID;
             break;
         case KD_UP:
-            action = ACTION_GO_UP;
+            if (depthHeight == 1)
+                action = ACTION_INVALID;
+            else
+                action = ACTION_GO_UP;
             break;
         case KD_DOWNLOAD:
             action = ACTION_DOWNLOAD;
@@ -331,34 +357,6 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth)
     }
     return action;
 };
-
-int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
-    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
-    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
-    int height;
-    switch (depth) {
-        case COURSES_DEPTH:
-            height = courses.len;
-            break;
-        case TOPICS_DEPTH:
-            height = topics.len;
-            break;
-        case MODULES_DEPTH:
-            height = modules.len;
-            break;
-        case MODULE_CONTENTS_DEPTH1:
-            height = 0;
-        case MODULE_CONTENTS_DEPTH2:
-            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
-                height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
-            else
-                height = -1;
-            break;
-        default:
-            height = -1;
-    }
-    return height;
-}
 
 void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets) {
     int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
@@ -399,8 +397,7 @@ void goDown(int *highlightedOption, int depthHeight, int maxHeight, int *scrollO
         *scrollOffset = 0;
     }
     else {
-        if (*highlightedOption == maxHeight - SCROLLOFF
-                && *highlightedOption + *scrollOffset != depthHeight - SCROLLOFF)
+        if (*highlightedOption >= maxHeight - SCROLLOFF && depthHeight - *scrollOffset > maxHeight)
             ++*scrollOffset;
         else
             ++*highlightedOption;

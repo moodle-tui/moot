@@ -62,7 +62,7 @@ void mainLoop (MDArray courses, MDClient *client);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
-OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int *depthHeight, int depth, int *scrollOffsets);
+OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int depth, int *scrollOffsets);
 
 char *getName(MDArray courses, OptionCoordinates printPos, int *highlightedOptions, int *scrollOffsets);
 
@@ -92,7 +92,7 @@ void printOption(char *optionName, int width);
 // in case.
 KeyDef getKeyDef(int key);
 
-Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth);
+Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight);
 
 int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
 
