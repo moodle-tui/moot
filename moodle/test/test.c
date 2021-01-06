@@ -21,6 +21,7 @@
 #define teststr(str) assertend(str != NULL)
 
 #define DEMO_SITE "https://school.moodledemo.net"
+#define SAVE_FILE "file.bin"
 
 // Gets token from
 char *get_token(MDError *error) {
@@ -59,17 +60,24 @@ int main() {
     if (error)
         goto end;
 
-    println("Accepting policy");
-    json_value_free(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
-    if (error)
-        goto end;
-
+    md_client_save_to_file(client, SAVE_FILE, &error);
+    if (!error) {
+        md_client_cleanup(client);
+        client = md_client_load_from_file(SAVE_FILE, &error);
+    }
+    assertend(error == MD_ERR_NONE);
     println("Client information:");
     println("Site: %s", client->siteName);
     println("Name: %s", client->fullName);
     assertend(!strcmp(client->siteName, "Mount Orange School"));
     assertend(!strcmp(client->fullName, "Mark Ellis"));
     assertend(client->uploadLimit > 0);
+
+    println("Accepting policy");
+    json_value_free(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
+    if (error)
+        goto end;
+
 
     println("Fetching courses");
     MDArray courses = md_client_fetch_courses(client, &error);
@@ -161,7 +169,6 @@ int main() {
     }
     println("Ok. Check for success on " DEMO_SITE "/mod/workshop/view.php?id=%d", workshop1->id);
 
-
     println("Loading status of modules");
     MDLoadedStatus status = md_courses_load_status(client, courses, &error);
     cleanStatus = true;
@@ -192,7 +199,6 @@ int main() {
     assertend(!strcmp(workshop1->contents.workshop.status.title, "Tit le"));
     assertend(workshop1->contents.workshop.status.submittedFiles.len == 1);
     assertend(!strcmp(MD_FILES(workshop1->contents.workshop.status.submittedFiles)[0].filename, "test_file.txt"));
-
 
 end:
     if (error)
