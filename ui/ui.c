@@ -3,7 +3,7 @@
 #include <string.h>
 #include "ui.h"
 #include "rlutil.h"
-#include "utf8.c"
+#include "utf8.h"
 #include "wcwidth.h"
 #include <curl/curl.h>
 #include "moodle.h"
