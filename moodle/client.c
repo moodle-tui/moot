@@ -16,6 +16,10 @@
 #define MD_NO_IDENTIFIER -1
 #define MD_NO_ITEM_ID 0
 
+// MD_CLIENT_STRING_FIELDS is a macro that expands to array initializer with
+// pointers to every string (char *) in given client (MDClient *).
+#define MD_CLIENT_STRING_FIELDS(client) {&client->fullName, &client->siteName, &client->token, &client->website}
+
 // List of known modules. Order is important. Indeces should match the types (MDModType).
 MDMod mdModList[MD_MOD_COUNT] = {
     {
@@ -60,7 +64,7 @@ MDMod mdModList[MD_MOD_COUNT] = {
     },
 };
 
-MDClient *md_client_new(char *token, char *website, MDError *error) {
+MDClient *md_client_new(cchar *token, cchar *website, MDError *error) {
     *error = MD_ERR_NONE;
     MDClient *client = (MDClient *)md_malloc(sizeof(MDClient), error);
     if (client) {
@@ -69,6 +73,68 @@ MDClient *md_client_new(char *token, char *website, MDError *error) {
         client->fullName = client->siteName = NULL;
     }
     return client;
+}
+
+MDClient *md_client_load_from_file(cchar *filename, MDError *error) {
+    *error = MD_ERR_NONE;
+    FILE *file = fopen(filename, "rb");
+    MDClient *client = NULL;
+    if (!file) {
+        *error = MD_ERR_FILE_OPERATION;
+    } else {
+        client = md_malloc(sizeof(MDClient), error);
+        if (client) {
+            char **clientStringFields[] = MD_CLIENT_STRING_FIELDS(client);
+            const int fieldCount = sizeof(clientStringFields) / sizeof(clientStringFields[0]);
+
+            for (int i = 0; i < fieldCount; ++i) {
+                *clientStringFields[i] = NULL;
+            }
+
+            if (!fread(client, sizeof(MDClient), 1, file)) {
+                *error = MD_ERR_FILE_OPERATION;
+            } else {
+                for (int i = 0; i < fieldCount && !*error; ++i) {
+                    *clientStringFields[i] = fread_string(file, error);
+                }
+            }
+        }
+        if (*error) {
+            md_client_cleanup(client);
+            client = NULL;
+        }
+        fclose(file);
+    }
+
+    if (*error == MD_ERR_FILE_OPERATION)
+        md_error_set_message(filename);
+    
+    return client;
+}
+
+void md_client_save_to_file(MDClient *client, cchar *filename, MDError *error) {
+    *error = MD_ERR_NONE;
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        *error = MD_ERR_FILE_OPERATION;
+    } else {
+        if (!fwrite(client, sizeof(MDClient), 1, file)) {
+            *error = MD_ERR_FILE_OPERATION;
+        } else {
+            char **clientStringFields[] = MD_CLIENT_STRING_FIELDS(client);
+            const int fieldCount = sizeof(clientStringFields) / sizeof(clientStringFields[0]);
+
+            for (int i = 0; i < fieldCount && !*error; ++i) {
+                if (!fwrite(*clientStringFields[i], strlen(*clientStringFields[i]) + 1, 1, file)) {
+                    *error = MD_ERR_FILE_OPERATION;
+                }
+            }
+        }
+        fclose(file);
+    }
+
+    if (*error == MD_ERR_FILE_OPERATION)
+        md_error_set_message(filename);
 }
 
 json_value *md_client_do_http_json_request(MDClient *client, MDError *error, char *wsfunction, cchar *format, ...) {
@@ -189,26 +255,25 @@ void md_array_init(MDArray *array) {
 void md_course_init(MDCourse *course) {
     course->name = NULL;
     course->id = MD_NO_IDENTIFIER;
-    // md_array_init(&course->topics);
+    md_array_init(&course->topics);
 }
 
 void md_course_cleanup(MDCourse *course) {
     free(course->name);
     md_array_cleanup(&course->topics, sizeof(MDTopic), (MDCleanupFunc)md_topic_cleanup);
-    // md_course_init(course);
 }
 
 void md_topic_init(MDTopic *topic) {
     topic->name = NULL;
     topic->id = MD_NO_IDENTIFIER;
-    // md_array_init(&topic->modules);
+    md_array_init(&topic->modules);
 }
 
 void md_topic_cleanup(MDTopic *topic) {
     free(topic->name);
     md_rich_text_cleanup(&topic->summary);
     md_array_cleanup(&topic->modules, sizeof(MDModule), (MDCleanupFunc)md_module_cleanup);
-    // md_topic_init(topic);
+    md_topic_init(topic);
 }
 
 void md_module_init(MDModule *module) {

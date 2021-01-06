@@ -6,6 +6,9 @@
 moodle/test/test
 moot
 
+# binary files
+*.bin
+
 # Prerequisites
 *.d
 

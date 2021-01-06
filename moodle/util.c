@@ -6,6 +6,7 @@
 #include "internal.h"
 #include "json.h"
 #define CURL_MAX_PARALLEL 20
+#define FREAD_CHUNK_SIZE 4096
 
 size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
@@ -226,6 +227,39 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error) {
         chunk.memory = NULL;
     }
     return chunk.memory;
+}
+
+char *fread_string(FILE *file, MDError *error) {
+    char buffer[FREAD_CHUNK_SIZE];
+    size_t bufferLength = 0, outputSize = 0;  
+    char *output = NULL;
+    int c = 1;
+
+    while (!*error && c != '\0') {
+        c = fgetc(file);
+        if (c == EOF || ferror(file)) {
+            *error = MD_ERR_FILE_OPERATION;
+        } else {
+            if (bufferLength == FREAD_CHUNK_SIZE || c == '\0') {
+                output = md_realloc(output, outputSize + bufferLength + 1, error);
+                if (output) {
+                    memcpy(output + outputSize, buffer, bufferLength);
+                    output[outputSize + bufferLength] = (char) c;
+                    outputSize += bufferLength + 1;
+                    bufferLength = 0;
+                }
+            } else {
+                buffer[bufferLength++] = (char) c;
+            }
+        }
+    }
+
+    if (*error) {
+        free(output);
+        output = NULL;
+    }
+
+    return output;
 }
 
 json_value *json_get_property_silent(json_value *json, cchar *key) {

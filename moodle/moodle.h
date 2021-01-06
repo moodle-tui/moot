@@ -69,8 +69,9 @@ typedef struct MDArray {
 // MD_NO_WORD_LIMIT means that word count is not limited.
 #define MD_NO_WORD_LIMIT 0
 
-// MDClient represents a single user on moodle. All of the functions are based on it.
-// MDClient should not be created manually, instead use md_client_new.
+// MDClient represents a single user on moodle. All of the functions are based
+// on it. MDClient should not be created manually, instead use md_client_new or
+// md_client_load_from_file.
 typedef struct MDClient {
     char *fullName, *siteName;
     int userid;
@@ -259,11 +260,13 @@ typedef struct MDLoadedStatus {
     MDArray internalReferences;
 } MDLoadedStatus;
 
-// md_courses_load_status loads statuses of modules in given courses (whether
-// it's submitted, graded, etc). The changes needs to be applied to courses
-// array using function md_loaded_status_apply. The result of a call to this
-// function can be freed using md_loaded_status_cleanup.
-MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error);
+// Functions
+//
+// Bellow are the functions of this library. All of them are documented, but it
+// should be mentioned that every pointer passed to a function bellow must be
+// valid and non-NULL pointer, unless stated otherwise. No NULL checks are made
+// by the library and this will not be repeated in the decriptions of following
+// functions.
 
 // md_loaded_status_apply applies loaded changes.
 void md_loaded_status_apply(MDLoadedStatus status);
@@ -275,10 +278,19 @@ void md_loaded_status_cleanup(MDLoadedStatus status);
 const char *md_error_get_message(MDError error);
 
 // md_client_new creates and returns new MDClient.
-MDClient *md_client_new(char *token, char *website, MDError *error);
+MDClient *md_client_new(const char *token, const char *website, MDError *error);
 
 // md_client_init initializes the client, which is required for all further operations.
 void md_client_init(MDClient *client, MDError *error);
+
+// md_client_save_to_file can be used to save client to given binary file. Later
+// a client can be loaded using md_client_load_from_file. 
+void md_client_save_to_file(MDClient *client, const char *filename, MDError *error);
+
+// md_client_load_from_file loads and returns a client from file, previously
+// saved using md_client_save_to_file. If the client was initialized before
+// saving, this function can be used to bypass the md_client_init function.
+MDClient *md_client_load_from_file(const char *filename, MDError *error);
 
 // md_client_cleanup releases all the resources owned by the client.
 void md_client_cleanup(MDClient *client);
@@ -312,4 +324,9 @@ void md_client_mod_workshop_submit(MDClient *client,
 // md_client_download_file downloads the given file to the stream.
 void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDError *error);
 
+// md_courses_load_status loads statuses of modules in given courses (whether
+// it's submitted, graded, etc). The changes needs to be applied to courses
+// array using function md_loaded_status_apply. The result of a call to this
+// function can be freed using md_loaded_status_cleanup.
+MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error);
 #endif

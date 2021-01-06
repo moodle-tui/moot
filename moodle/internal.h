@@ -74,6 +74,10 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error);
 // @return response data, that the caller is responsible to free.
 char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error);
 
+// fread_string reads zero-terminated string from binary file, scanning in
+// chunks and returning allocated memory which needs to be freed later.
+char *fread_string(FILE *file, MDError *error);
+
 // json_get_property_silent finds and returns a property of json object if
 // found, NULL otherwise.
 json_value *json_get_property_silent(json_value *json, cchar *key);
@@ -123,7 +127,6 @@ typedef struct MDMod {
     MDCleanupFunc cleanupFunc;
     MDStatusParseFunc statusParseFunc; // if NULL, it does not parse status.
 } MDMod;
-
 
 // md_array_init_new initializes given array, optionaly calling callback for each created element
 // (if callback isn't NULL). The array must be cleaned later up using md_array_cleanup.
