@@ -7,14 +7,15 @@
 #include "wcwidth.h"
 #include <curl/curl.h>
 #include "moodle.h"
+#include "config.h"
 
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
 
-    FILE *f = fopen(".token", "r");
-    char token[100];
-    fread_line(f, token, 99);
-    printf("%s", token);
+    FILE *f = fopen("/home/ramojus/studijos/.token", "r");
+    char *token;
+    if (readConfigFile(&token) == -1)
+        getchar();
     MDError err;
     MDClient *client = md_client_new(token, "https://emokymai.vu.lt", &err);
     if (err) {

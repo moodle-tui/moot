@@ -24,7 +24,7 @@ $(LIB)/%.o: $(LIB)/%.c
 $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) -o $@
 
-$(UI_OBJ): $(UI_SRC) $(MOODLE_OBJ) $(LIB_OBJ) $(LIB)/rlutil.h
+$(UI)/%.o: $(UI)/%.c $(MOODLE_OBJ) $(LIB_OBJ) $(LIB)/rlutil.h
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
 
 $(LIB): $(LIB_OBJ)
