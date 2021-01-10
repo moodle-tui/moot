@@ -19,9 +19,10 @@
 
 // Checks if a string is valid.
 #define teststr(str) assertend(str != NULL)
-
 #define DEMO_SITE "https://school.moodledemo.net"
 #define SAVE_FILE "file.bin"
+#define CREDENTIALS_LENGTH 100
+#define VU_SSO_PLUGIN "moodle/plugins/vu_sso.mtplug"
 
 // Gets token from
 char *get_token(MDError *error) {
@@ -39,6 +40,42 @@ char *get_token(MDError *error) {
     }
     free(data);
     return token;
+}
+
+int fread_line(FILE *f, char *s, int n) {
+    s[0] = '\0';
+    int len = 0, cutOff = 0;
+    char c = 0;
+    do {
+        c = fgetc(f);
+        if (c != '\n' && !feof(f)) {
+            if (len == n)
+                cutOff = 1;
+
+            if (len < n)
+                s[len++] = c;
+        }
+    } while (!feof(f) && c != '\n');
+    s[len] = '\0';
+    return cutOff;
+}
+
+void test_vu_sso_auth(MDError *error) {
+    println("Testing login to VU system");
+    char username[CREDENTIALS_LENGTH], password[CREDENTIALS_LENGTH];
+    printf("username: ");
+    fread_line(stdin, username, CREDENTIALS_LENGTH);
+    printf("password: ");
+    fread_line(stdin, password, CREDENTIALS_LENGTH);
+    md_auth_load_plugin(VU_SSO_PLUGIN, error);
+    if (!*error) {
+        char *token = md_auth_login("emokymai.vu.lt", username, password, error);
+        if (token) {
+            printf("Success! token: %s\n", token);
+        }
+        free(token);
+    }
+    md_auth_cleanup_plugins();
 }
 
 int main() {
@@ -77,7 +114,6 @@ int main() {
     json_value_free(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
     if (error)
         goto end;
-
 
     println("Fetching courses");
     MDArray courses = md_client_fetch_courses(client, &error);
@@ -199,6 +235,7 @@ int main() {
     assertend(!strcmp(workshop1->contents.workshop.status.title, "Tit le"));
     assertend(workshop1->contents.workshop.status.submittedFiles.len == 1);
     assertend(!strcmp(MD_FILES(workshop1->contents.workshop.status.submittedFiles)[0].filename, "test_file.txt"));
+    test_vu_sso_auth(&error);
 
 end:
     if (error)

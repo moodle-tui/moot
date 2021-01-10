@@ -1,15 +1,17 @@
-#ifndef __MT_INTERNAL_H
-#define __MT_INTERNAL_H
-
 /*
  * Copyright (C) 2020 Nojus Gudinavičius
  * nojus.gudinavicius@gmail.com
  * https://github.com/moodle-tui/moot
  */
 
+#ifndef __MT_INTERNAL_H
+#define __MT_INTERNAL_H
+
 #include <stdarg.h>
 #include "json.h"
 #include "moodle.h"
+// Macro for zero initializer of a MDArray
+#define MD_ARRAY_INITIALIZER {.len = 0, ._data = NULL};
 
 typedef const char cchar;
 
@@ -34,12 +36,14 @@ void md_set_error_handling_warning();
 
 // util.c
 
+void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error);
+
 // struct to temporarily hold data while performing http request.
-struct Memblock {
+typedef struct Memblock {
     char *memory;
     size_t size;
     MDError *error;
-};
+} Memblock;
 
 // str_replace replaces all occurrences of needle with replacement in the given
 // string. Replacement must be no longer than the needle.
@@ -56,6 +60,14 @@ void *md_realloc(void *data, size_t size, MDError *error);
 
 // clone_str returns allocated a copy of provided string.
 char *clone_str(cchar *s, MDError *error);
+
+typedef size_t WriteCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
+
+// create_curl creates a common handle for http requests. 
+void *create_curl(cchar *url, void *data, WriteCallback callback, MDError *error);
+
+// write_memblock_callback writes to memblock.
+size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp);
 
 // http_get_request_to_file makes http get request to stream and writes data to
 // given stream.
@@ -95,6 +107,17 @@ cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error);
 json_value *json_get_array(json_value *json, cchar *key, MDError *error);
 json_value *json_get_object(json_value *json, cchar *key, MDError *error);
 
+// Authentication
+
+// MDPlugin is a loaded authentication plugin with non-NULL functions.
+typedef struct MDPlugin {
+    IsSupportedFunc isSupported;
+    GetTokenFunc getToken;
+    void *handle;
+} MDPlugin;
+
+void md_auth_plugin_cleanup(MDPlugin *plugin);
+
 // client.c
 
 typedef struct MDStatusRef {
@@ -125,7 +148,7 @@ typedef struct MDMod {
     MDParseFunc parseFunc;
     MDInitFunc initFunc;
     MDCleanupFunc cleanupFunc;
-    MDStatusParseFunc statusParseFunc; // if NULL, it does not parse status.
+    MDStatusParseFunc statusParseFunc;  // if NULL, it does not parse status.
 } MDMod;
 
 // md_array_init_new initializes given array, optionaly calling callback for each created element

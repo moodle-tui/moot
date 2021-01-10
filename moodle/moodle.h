@@ -20,6 +20,7 @@
 #define __MOODLE_H
 
 #include <time.h>
+#include <stdio.h>
 #include "stdbool.h"
 
 #define DEBUG(var)                                                                             \
@@ -250,6 +251,10 @@ typedef enum MDError {
     MD_ERR_FILE_OPERATION,
     MD_ERR_MISUSED_MOODLE_API,
     MD_ERR_MISMACHING_MOODLE_DATA,
+    MD_ERR_FAILED_PLUGIN_LOGIN,
+    MD_ERR_NO_MATCHING_PLUGIN_FOUND,
+    MD_ERR_FAILED_TO_LOAD_PLUGIN,
+    MD_ERR_MISSING_PLUGIN_FUNCTION,
 } MDError;
 
 // MDLoadedStatus is a type to hold preloaded module statuses using
@@ -329,4 +334,41 @@ void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDErr
 // array using function md_loaded_status_apply. The result of a call to this
 // function can be freed using md_loaded_status_cleanup.
 MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error);
+
+// Plugins and authentication
+//
+// While normal client creation and authentication requires a token, some moodle
+// sites have a third party login system, which makes the process of getting the
+// moodle token harder. Therefore custom plugins may be made for specific sites
+// and loaded dinamically on runtime. They are basically shared libraries with
+// functions described bellow.
+
+// Plugin for authentication must have these two functions
+//
+// IsSupportedFunc must be equal to macro IS_SUPPORTED_NAME and should return
+// non 0 when the module can not be used to login to moodle system located on
+// the given url.
+typedef int (*IsSupportedFunc)(const char *url);
+// GetTokenFunc must be equal to macro GET_TOKEN_NAME and should try to login to
+// given (supported) url using username and password, returning allocated moodle
+// token or NULL.
+typedef char *(*GetTokenFunc)(const char *url, const char *user, const char *pass);
+
+#define IS_SUPPORTED_NAME "is_supported"
+#define GET_TOKEN_NAME "get_token"
+
+// md_auth_load_plugin tries to load a new auth plugin specified by the
+// filename. Once loaded, it will be used (if it accepts the website) when
+// calling md_auth_login. The caller is responsible to free the resources using
+// md_auth_cleanup_plugins.
+void md_auth_load_plugin(const char *filename, MDError *error);
+
+// md_auth_cleanup_plugins releases the resources held by all the plugins loaded
+// using md_auth_load_plugin.
+void md_auth_cleanup_plugins();
+
+// md_auth_login tries to log in with each loaded plugin that supports the given
+// website. On success token is returned that the caller is responsible to free.
+char *md_auth_login(const char *website, const char *username, const char *password, MDError *error);
+
 #endif

@@ -27,6 +27,10 @@ struct errorMsg {
     {MD_ERR_FILE_OPERATION, "Unable to perform operation on file %s"},
     {MD_ERR_MISUSED_MOODLE_API, "Moodle api c function was used incorrectly"},
     {MD_ERR_MISMACHING_MOODLE_DATA, "Moodle server returned different data from different calls"},
+    {MD_ERR_FAILED_PLUGIN_LOGIN, "Failed to login using plugin"}, 
+    {MD_ERR_NO_MATCHING_PLUGIN_FOUND, "No matching plugin found for website %s"}, 
+    {MD_ERR_FAILED_TO_LOAD_PLUGIN, "Failed to load plugin: %s"}, 
+    {MD_ERR_MISSING_PLUGIN_FUNCTION, "Missing function required for a plugin: %s"}, 
 };
 
 void md_set_error_handling_warning() {

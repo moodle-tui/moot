@@ -8,6 +8,14 @@
 #define CURL_MAX_PARALLEL 20
 #define FREAD_CHUNK_SIZE 4096
 
+void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error) {
+    ++array->len;
+    array->_data = md_realloc(array->_data, array->len * size, error);
+    if (!*error) {
+        memcpy(array->_data + (array->len - 1) * size, elem, size);
+    }
+}
+
 size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     struct Memblock *mem = (struct Memblock *)userp;
@@ -43,8 +51,6 @@ char *clone_str(cchar *s, MDError *error) {
     return str;
 }
 
-typedef size_t WriteCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
-
 char *url_escape(cchar *url, MDError *error) {
     char *escaped = curl_escape(url, 0);
     if (!escaped)
@@ -68,7 +74,7 @@ void str_replace(char *str, cchar *needle, cchar *replacement) {
     }
 }
 
-CURL *createCurl(cchar *url, void *data, WriteCallback callback, MDError *error) {
+CURL *create_curl(cchar *url, void *data, WriteCallback callback, MDError *error) {
     CURL *handle = curl_easy_init();
     if (handle) {
         curl_easy_setopt(handle, CURLOPT_FAILONERROR, 1L);
@@ -88,7 +94,7 @@ size_t write_stream_callback(void *contents, size_t size, size_t nmemb, void *st
 }
 
 void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
-    CURL *handle = createCurl(url, (void *)stream, write_stream_callback, error);
+    CURL *handle = create_curl(url, (void *)stream, write_stream_callback, error);
     if (!handle)
         return;
 
@@ -110,7 +116,7 @@ char *http_get_request(char *url, MDError *error) {
     chunk.size = 0;
     chunk.memory = (char *)md_malloc(1, error);
     if (!*error) {
-        handle = createCurl(url, (void *)&chunk, write_memblock_callback, error);
+        handle = create_curl(url, (void *)&chunk, write_memblock_callback, error);
         if (!*error) {
             res = curl_easy_perform(handle);
             if (res != CURLE_OK) {
@@ -147,7 +153,7 @@ char **http_get_multi_request(char *urls[], unsigned int size, MDError *error) {
     }
     CURL *handles[size];
     for (int i = 0; i < size; ++i) {
-        handles[i] = createCurl(urls[i], (void *)&chunks[i], write_memblock_callback, error);
+        handles[i] = create_curl(urls[i], (void *)&chunks[i], write_memblock_callback, error);
     }
     if (!*error) {
         for (transfers = 0; transfers < CURL_MAX_PARALLEL && transfers < size; transfers++)
@@ -196,7 +202,7 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error) {
     struct Memblock chunk;
     chunk.size = 0;
     chunk.memory = (char *)md_malloc(1, error);
-    CURL *handle = createCurl(url, &chunk, write_memblock_callback, error);
+    CURL *handle = create_curl(url, &chunk, write_memblock_callback, error);
     if (!*error) {
         curl_mime *mime;
         curl_mimepart *part;
@@ -231,7 +237,7 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error) {
 
 char *fread_string(FILE *file, MDError *error) {
     char buffer[FREAD_CHUNK_SIZE];
-    size_t bufferLength = 0, outputSize = 0;  
+    size_t bufferLength = 0, outputSize = 0;
     char *output = NULL;
     int c = 1;
 
@@ -244,12 +250,12 @@ char *fread_string(FILE *file, MDError *error) {
                 output = md_realloc(output, outputSize + bufferLength + 1, error);
                 if (output) {
                     memcpy(output + outputSize, buffer, bufferLength);
-                    output[outputSize + bufferLength] = (char) c;
+                    output[outputSize + bufferLength] = (char)c;
                     outputSize += bufferLength + 1;
                     bufferLength = 0;
                 }
             } else {
-                buffer[bufferLength++] = (char) c;
+                buffer[bufferLength++] = (char)c;
             }
         }
     }
