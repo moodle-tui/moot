@@ -8,35 +8,33 @@
 #include <curl/curl.h>
 #include "moodle.h"
 #include "config.h"
+#include "msg.h"
 
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
 
-    FILE *f = fopen("/home/ramojus/studijos/.token", "r");
-    char *token;
-    if (readConfigFile(&token) == -1)
-        getchar();
-    MDError err;
-    MDClient *client = md_client_new(token, "https://emokymai.vu.lt", &err);
-    if (err) {
-        char msg[100];
-        sprintf(msg, "%s", md_error_get_message(err));
-        printErr(msg);
+    ConfigValues configValues;
+    CFGError cfgError;
+    readConfigFile(&configValues, &cfgError);
+    if (cfgError) {
+        msgErr(cfg_error_get_message(cfgError));
+        return 0;
+    }
+    MDError mdError;
+    MDClient *client = md_client_new(configValues.token, "https://emokymai.vu.lt", &mdError);
+    if (mdError) {
+        msgErr(md_error_get_message(mdError));
         return 0;
     }
 
-    md_client_init(client, &err);
-    if (err) {
-        char msg[100];
-        sprintf(msg, "%s", md_error_get_message(err));
-        printErr(msg);
+    md_client_init(client, &mdError);
+    if (mdError) {
+        msgErr(md_error_get_message(mdError));
         return 0;
     }
-    MDArray courseArr = md_client_fetch_courses(client, &err);
-    if (err) {
-        char msg[100];
-        sprintf(msg, "%s", md_error_get_message(err));
-        printErr(msg);
+    MDArray courseArr = md_client_fetch_courses(client, &mdError);
+    if (mdError) {
+        msgErr(md_error_get_message(mdError));
         return 0;
     }
 
@@ -48,7 +46,6 @@ int main() {
 
     md_courses_cleanup(courseArr);
     md_client_cleanup(client);
-    fclose(f);
     curl_global_cleanup();
 }
 
@@ -159,8 +156,6 @@ char *getMDArrayName(MDArray mdArray, int height, int depthIndex) {
             case 2:
                 name = MD_MODULES(mdArray)[height].name;
                 break;
-            default:
-                printErr("Wrong depth index\n");
         }
     }
     else
@@ -202,7 +197,7 @@ void addOption(char *name, int optionDepth, _Bool isHighlighted, int widthIndex,
         printf("%s", SEPERATOR);
 
     if (name == NULL) {
-        printErr("Invalid option name. Expected string, got NULL");
+        msgErr("Invalid option name. Expected string, got NULL");
     }
     if (isHighlighted) {
         printHighlightedOption(name, width);
@@ -443,7 +438,7 @@ MDFile getMDFile(MDArray courses, int *highlightedOptions) {
         mdFile = MD_FILES(resource.files)[highlightedOptions[4]];
     }
     else
-        notifySmall("Couldn't get file", RED);
+        msgSmall("Couldn't get file", RED);
 
     return mdFile;
 }
@@ -453,20 +448,20 @@ void downloadFile(MDFile mdFile, MDClient *client) {
     char msg[1000];
     if (!file) {
         sprintf(msg, "Couldn't open %s for writing", mdFile.filename);
-        printErr(msg);
+        msgErr(msg);
     }
     MDError err;
     sprintf(msg, "Downloading: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    notifySmall(msg, BLUE);
+    msgSmall(msg, BLUE);
     md_client_download_file(client, &mdFile, file, &err);
     sprintf(msg, "Downloaded: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    notifySmall(msg, GREEN);
+    msgSmall(msg, GREEN);
     fclose(file);
 
     if (err) {
         char msg[100];
         sprintf(msg, "%s", md_error_get_message(err));
-        printErr(msg);
+        msgErr(msg);
     }
 }
 
@@ -499,68 +494,3 @@ int getMax(int *array, int size) {
     return max;
 }
 
-void notifyBig(char *msg, int color) {
-    int msgLen = strlen(msg);
-    int x = (tcols() / 2) - (msgLen / 2);
-    int y = trows() / 2 - 2;
-    locate(x, y);
-    saveDefaultColor();
-    setColor(color);
-    
-    printf(" ┌");
-    for (int i = 0; i < msgLen + 2; ++i)
-        printf("─");
-    printf("┐ \n");
-
-    locate(x, ++y);
-    printf(" │ ");
-    resetColor();
-    printf("%s", msg);
-    setColor(color);
-    printf(" │ \n");
-
-    locate(x, ++y);
-    printf(" └");
-    for (int i = 0; i < msgLen + 2; ++i)
-        printf("─");
-    printf("┘ ");
-
-    resetColor();
-    getch();
-}
-
-void notifySmall(char *msg, int color) {
-    locate (0, trows());
-    printSpaces(tcols());
-    locate (0, trows());
-    saveDefaultColor();
-    setColor(color);
-    printf(" %s ",  msg);
-    resetColor();
-}
-
-void printErr(char *msg) {
-    showcursor();
-    locate(0, 0);
-    saveDefaultColor();
-    setBackgroundColor(RED);
-    printf("Error: %s ", msg);
-    resetColor();
-    getch();
-}
-
-int fread_line(FILE *f, char *s, int n) {
-    s[0] = '\0';
-    int len = 0, cutOff = 0;
-    char c = 0;
-    do {
-        c = fgetc(f);
-        if (c != '\n' && !feof(f)) {
-            if (len == n) cutOff = 1;
-
-            if (len < n) s[len++] = c;
-        }
-    } while (!feof(f) && c != '\n');
-    s[len] = '\0';
-    return cutOff;
-}

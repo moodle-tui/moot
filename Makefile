@@ -3,6 +3,7 @@ include config.mk
 LDLIBS = -lcurl -lm -ldl
 INCLUDE_LIB = -Ilib/
 INCLUDE_MOODLE = -Imoodle/
+INCLUDE_CONFIG = -Iconfig/
 
 LIB = lib
 LIB_SRC = $(wildcard $(LIB)/*.c)
@@ -17,6 +18,10 @@ UI = ui
 UI_SRC = $(wildcard $(UI)/*.c)
 UI_OBJ = $(UI_SRC:%.c=%.o)
 
+CONFIG = config
+CONFIG_SRC = $(wildcard $(CONFIG)/*.c)
+CONFIG_OBJ = $(CONFIG_SRC:%.c=%.o)
+
 PLUGINS = $(MOODLE)/plugins
 PLUGIN_EXT = mtplug
 
@@ -28,16 +33,21 @@ $(LIB)/%.o: $(LIB)/%.c
 $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) -o $@
 
-$(UI)/%.o: $(UI)/%.c $(MOODLE_OBJ) $(LIB_OBJ) $(LIB)/rlutil.h
-	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
+$(CONFIG)/%.o: $(CONFIG)/%.c
+	$(CC) $(CCFLAGS) -c $< $(LDLIBS) -o $@
+
+$(UI)/%.o: $(UI)/%.c $(LIB_OBJ) $(MOODLE_OBJ) $(CONFIG_OBJ)
+	$(CC) $(CCFLAGS) -c $< $(INCLUDE_CONFIG) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
 
 $(LIB): $(LIB_OBJ)
 
 $(MOODLE): $(MOODLE_REQ) $(MOODLE_OBJ)
 
-$(UI): $(UI_OBJ)
+$(CONFIG): $(CONFIG_OBJ)
 
-moot: $(UI_OBJ) $(MOODLE_OBJ) $(LIB_OBJ)
+$(UI): $(LIB) $(UI_OBJ)
+
+moot: $(CONFIG_OBJ) $(UI_OBJ) $(MOODLE_OBJ) $(LIB_OBJ)
 	$(CC) $(CCFLAGS) $^ $(LDLIBS) $(LIBS) -o $(TARGET)
 
 TEST = moodle/test/test
@@ -52,6 +62,7 @@ clean:
 	$(RM) $(LIB_OBJ)
 	$(RM) $(MOODLE_OBJ)
 	$(RM) $(UI_OBJ)
+	$(RM) $(CONFIG_OBJ)
 	$(RM) $(TARGET)
 	$(RM) $(TEST)
 	$(RM) $(VU_SSO).$(PLUGIN_EXT)

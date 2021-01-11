@@ -1,7 +1,6 @@
 #ifndef UI_H
 #define UI_H
 
-#include <stdio.h>
 #include "moodle.h"
 
 #define EMPTY_OPTION_NAME "[empty]"
@@ -88,8 +87,8 @@ void printHighlightedOption(char *optionName, int width);
 void printOption(char *optionName, int width);
 
 // getKeyDef returns KeyDef equivalent of a pressed key, so that vi keys are also supported.
-// KEY_* macros are from rlutil.h lib, and they are not working for me but, I left them just
-// in case.
+// KEY_* macros are from rlutil.h lib and are not working for me, but I left them just in case.
+// TODO: figure out if KEY_* macros do something on other systems
 KeyDef getKeyDef(int key);
 
 Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight);
@@ -122,17 +121,6 @@ int *getWidths(int sepLength);
 
 // getMax gets max value from array
 int getMax(int *array, int size);
-
-// notifyBig prints box with msg in the middle of the screen, waits for keypress,
-// then disappears. Box borders are printed in the color that is passed.
-void notifyBig(char *msg, int color);
-
-// notifySmall prints msg in bottom left corner. msg text is printed in the color
-// that is passed.
-void notifySmall(char *msg, int color);
-
-// printErr prints msg in red background, waits for key press, then disappears
-void printErr(char *msg);
 
 // fread_line reads single line up to n bytes from file with \n removed. s should be at
 // least n + 1 in length. 1 is returned if the line is too long and was cut off.
