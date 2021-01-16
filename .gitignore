@@ -6,6 +6,9 @@
 moodle/test/test
 moot
 
+# compiled plugins
+*.mtplug
+
 # binary files
 *.bin
 
