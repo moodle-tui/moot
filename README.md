@@ -62,7 +62,7 @@ While it has only been built and tested on linux, it is coded with portability a
 
 #### Requirements
  - GNU make
- - C compiler (at least C99)
+ - C compiler (at least C11)
  - [libcurl](https://curl.se/libcurl/)
 
 #### Configuring
