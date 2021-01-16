@@ -56,7 +56,7 @@ test: $(MOODLE_OBJ) $(LIB_OBJ) vu_sso_plugin
 
 VU_SSO = $(PLUGINS)/vu_sso
 vu_sso_plugin: $(LIB)/base64.o
-	$(CC) $(CCFLAGS) -shared $(VU_SSO).c $^ $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(VU_SSO).$(PLUGIN_EXT)
+	$(CC) $(CCFLAGS) -shared $(VU_SSO).c $^ $(INCLUDE_LIB) $(INCLUDE_MOODLE) $(LDLIBS) $(LIBS) -o $(VU_SSO).$(PLUGIN_EXT)
 
 clean:
 	$(RM) $(LIB_OBJ)

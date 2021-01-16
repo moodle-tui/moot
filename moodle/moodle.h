@@ -254,7 +254,8 @@ typedef enum MDError {
     MD_ERR_FAILED_PLUGIN_LOGIN,
     MD_ERR_NO_MATCHING_PLUGIN_FOUND,
     MD_ERR_FAILED_TO_LOAD_PLUGIN,
-    MD_ERR_MISSING_PLUGIN_FUNCTION,
+    MD_ERR_MISSING_PLUGIN_VAR,
+    MD_ERR_INVALID_PLUGIN,
 } MDError;
 
 // MDLoadedStatus is a type to hold preloaded module statuses using
@@ -335,27 +336,7 @@ void md_client_download_file(MDClient *client, MDFile *file, FILE *stream, MDErr
 // function can be freed using md_loaded_status_cleanup.
 MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError *error);
 
-// Plugins and authentication
-//
-// While normal client creation and authentication requires a token, some moodle
-// sites have a third party login system, which makes the process of getting the
-// moodle token harder. Therefore custom plugins may be made for specific sites
-// and loaded dinamically on runtime. They are basically shared libraries with
-// functions described bellow.
-
-// Plugin for authentication must have these two functions
-//
-// IsSupportedFunc must be equal to macro IS_SUPPORTED_NAME and should return
-// non 0 when the module can not be used to login to moodle system located on
-// the given url.
-typedef int (*IsSupportedFunc)(const char *url);
-// GetTokenFunc must be equal to macro GET_TOKEN_NAME and should try to login to
-// given (supported) url using username and password, returning allocated moodle
-// token or NULL.
-typedef char *(*GetTokenFunc)(const char *url, const char *user, const char *pass);
-
-#define IS_SUPPORTED_NAME "is_supported"
-#define GET_TOKEN_NAME "get_token"
+// See auth.h for implementing a custom plugin.
 
 // md_auth_load_plugin tries to load a new auth plugin specified by the
 // filename. Once loaded, it will be used (if it accepts the website) when

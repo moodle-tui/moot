@@ -5,13 +5,14 @@
  * Hacky authentication system for Vilnius University Single-Oauth-System. Meant
  * to be used to log in into https://emokymai.vu.lt
  * 
- * Complying to moot auth plugin structure described in internal.h
+ * Complying to moot auth plugin structure described in moodle.h
  */
 
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
 #include "base64.h"
+#include "auth.h"
 
 #define URL_LENGTH 4096
 #define WEBSITE "emokymai.vu.lt"
@@ -182,3 +183,9 @@ char *get_token(const char *url, const char *user, const char *pass) {
     curl_easy_cleanup(handle);
     return token;
 }
+
+// Exposing the functions of this plugin.
+MDPlugin MD_PLUGIN_NAME = {
+    .isSupported = is_supported,
+    .getToken = get_token,
+};

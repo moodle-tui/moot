@@ -30,7 +30,8 @@ struct errorMsg {
     {MD_ERR_FAILED_PLUGIN_LOGIN, "Failed to login using plugin"}, 
     {MD_ERR_NO_MATCHING_PLUGIN_FOUND, "No matching plugin found for website %s"}, 
     {MD_ERR_FAILED_TO_LOAD_PLUGIN, "Failed to load plugin: %s"}, 
-    {MD_ERR_MISSING_PLUGIN_FUNCTION, "Missing function required for a plugin: %s"}, 
+    {MD_ERR_MISSING_PLUGIN_VAR, "Missing plugin variable required for a plugin: %s"}, 
+    {MD_ERR_INVALID_PLUGIN, "Plugin %s is invalid"}, 
 };
 
 void md_set_error_handling_warning() {

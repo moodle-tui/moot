@@ -10,8 +10,10 @@
 #include <stdarg.h>
 #include "json.h"
 #include "moodle.h"
+#include "auth.h"
+
 // Macro for zero initializer of a MDArray
-#define MD_ARRAY_INITIALIZER {.len = 0, ._data = NULL};
+#define MD_ARRAY_INITIALIZER {.len = 0, ._data = NULL}
 
 typedef const char cchar;
 
@@ -109,14 +111,13 @@ json_value *json_get_object(json_value *json, cchar *key, MDError *error);
 
 // Authentication
 
-// MDPlugin is a loaded authentication plugin with non-NULL functions.
-typedef struct MDPlugin {
-    IsSupportedFunc isSupported;
-    GetTokenFunc getToken;
+// MDLoadedPlugin is a loaded authentication plugin with non-NULL functions.
+typedef struct MDLoadedPlugin {
+    struct MDPlugin plugin;
     void *handle;
-} MDPlugin;
+} MDLoadedPlugin;
 
-void md_auth_plugin_cleanup(MDPlugin *plugin);
+void md_auth_plugin_cleanup(MDLoadedPlugin *plugin);
 
 // client.c
 
