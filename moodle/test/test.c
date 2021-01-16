@@ -79,7 +79,6 @@ void test_vu_sso_auth(MDError *error) {
 }
 
 int main() {
-    curl_global_init(CURL_GLOBAL_ALL);
     bool cleanStatus = false, cleanClient = false, cleanCourses = false;
     MDError error = MD_ERR_NONE;
     char *token = get_token(&error);

@@ -18,7 +18,8 @@
 
 // MD_CLIENT_STRING_FIELDS is a macro that expands to array initializer with
 // pointers to every string (char *) in given client (MDClient *).
-#define MD_CLIENT_STRING_FIELDS(client) {&client->fullName, &client->siteName, &client->token, &client->website}
+#define MD_CLIENT_STRING_FIELDS(client) \
+    { &client->fullName, &client->siteName, &client->token, &client->website }
 
 // List of known modules. Order is important. Indeces should match the types (MDModType).
 MDMod mdModList[MD_MOD_COUNT] = {
@@ -108,7 +109,7 @@ MDClient *md_client_load_from_file(cchar *filename, MDError *error) {
 
     if (*error == MD_ERR_FILE_OPERATION)
         md_error_set_message(filename);
-    
+
     return client;
 }
 
@@ -154,8 +155,7 @@ json_value *md_client_do_http_json_request(MDClient *client, MDError *error, cha
 }
 
 int md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cchar *format, va_list args) {
-    int len = snprintf(url, MD_URL_LENGTH, "%s%s?" MD_WSTOKEN "=%s&%s&" MD_WSFUNCTION "=%s", client->website,
-                       MD_SERVICE_URL, client->token, MD_PARAM_JSON, wsfunction);
+    int len = snprintf(url, MD_URL_LENGTH, "%s%s?" MD_WSTOKEN "=%s&%s&" MD_WSFUNCTION "=%s", client->website, MD_SERVICE_URL, client->token, MD_PARAM_JSON, wsfunction);
     return len + vsnprintf(url + len, MD_URL_LENGTH - len, format, args);
 }
 
@@ -181,8 +181,7 @@ void md_client_init(MDClient *client, MDError *error) {
 
 MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
     *error = MD_ERR_NONE;
-    json_value *jsonCourses =
-        md_client_do_http_json_request(client, error, "core_enrol_get_users_courses", "&userid=%d", client->userid);
+    json_value *jsonCourses = md_client_do_http_json_request(client, error, "core_enrol_get_users_courses", "&userid=%d", client->userid);
 
     MDArray courses;
     md_array_init(&courses);
@@ -512,8 +511,7 @@ void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError 
     int count = courses.len + MD_MOD_COUNT;
     char urls[count][MD_URL_LENGTH];
     for (int i = 0; i < courses.len; ++i) {
-        md_client_write_url(client, urls[i], "core_course_get_contents", "&courseid=%d",
-                            MD_ARR(courses, MDCourse)[i].id);
+        md_client_write_url(client, urls[i], "core_course_get_contents", "&courseid=%d", MD_ARR(courses, MDCourse)[i].id);
     }
     for (int i = 0; i < MD_MOD_COUNT; ++i) {
         md_client_write_url(client, urls[courses.len + i], mdModList[i].parseWsFunction, "");
@@ -622,11 +620,7 @@ cchar *md_find_moodle_warning(json_value *json) {
     return NULL;
 }
 
-void md_client_mod_assign_submit(MDClient *client,
-                                 MDModule *assignment,
-                                 MDArray *filenames,
-                                 MDRichText *text,
-                                 MDError *error) {
+void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray *filenames, MDRichText *text, MDError *error) {
     *error = MD_ERR_NONE;
     char params[MD_URL_LENGTH] = "";
     int len = 0;
@@ -637,11 +631,15 @@ void md_client_mod_assign_submit(MDClient *client,
         len = snprintf(params + len, MD_URL_LENGTH - len, "&plugindata[files_filemanager]=%ld", itemId);
     }
     if (text) {
-        len = snprintf(params + len, MD_URL_LENGTH - len,
-                       "&plugindata[onlinetext_editor][text]=%s"
-                       "&plugindata[onlinetext_editor][format]=%d"
-                       "&plugindata[onlinetext_editor][itemid]=0",
-                       url_escape(text->text, error), text->format);
+        char *escaped = url_escape(text->text, error);
+        if (escaped) {
+            len = snprintf(params + len, MD_URL_LENGTH - len,
+                           "&plugindata[onlinetext_editor][text]=%s"
+                           "&plugindata[onlinetext_editor][format]=%d"
+                           "&plugindata[onlinetext_editor][itemid]=0",
+                           escaped, text->format);
+            curl_free(escaped);
+        }
         if (*error)
             return;
     }
@@ -660,12 +658,7 @@ void md_client_mod_assign_submit(MDClient *client,
     json_value_free(json);
 }
 
-void md_client_mod_workshop_submit(MDClient *client,
-                                   MDModule *workshop,
-                                   MDArray *filenames,
-                                   MDRichText *text,
-                                   cchar *title,
-                                   MDError *error) {
+void md_client_mod_workshop_submit(MDClient *client, MDModule *workshop, MDArray *filenames, MDRichText *text, cchar *title, MDError *error) {
     *error = MD_ERR_NONE;
     char params[MD_URL_LENGTH] = "";
     int len = 0;
@@ -676,8 +669,7 @@ void md_client_mod_workshop_submit(MDClient *client,
         len = snprintf(params + len, MD_URL_LENGTH - len, "&attachmentsid=%ld", itemId);
     }
     if (text) {
-        len = snprintf(params + len, MD_URL_LENGTH - len, "&content=%s&contentformat=%d", url_escape(text->text, error),
-                       text->format);
+        len = snprintf(params + len, MD_URL_LENGTH - len, "&content=%s&contentformat=%d", url_escape(text->text, error), text->format);
     }
     title = url_escape(title, error);
     if (*error)
@@ -820,8 +812,7 @@ void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, 
             workshop->textSubmission.wordLimit = MD_NO_WORD_LIMIT;
             workshop->fileSubmission.status = json_get_integer(jsonWorkshop, "submissiontypefile", error);
             if (workshop->fileSubmission.status != MD_SUBMISSION_DISABLED) {
-                workshop->fileSubmission.acceptedFileTypes =
-                    json_get_string(jsonWorkshop, "submissionfiletypes", error);
+                workshop->fileSubmission.acceptedFileTypes = json_get_string(jsonWorkshop, "submissionfiletypes", error);
                 workshop->fileSubmission.maxSubmissionSize = json_get_integer(jsonWorkshop, "maxbytes", error);
                 if (workshop->fileSubmission.maxSubmissionSize == 0)
                     workshop->fileSubmission.maxSubmissionSize = client->uploadLimit;
@@ -906,8 +897,7 @@ MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError
                     MDStatusRef *statusRef = &MD_ARR(result.internalReferences, MDStatusRef)[index];
                     statusRef->module = module;
                     md_status_ref_init(statusRef);
-                    md_client_write_url(client, urls[index], mdModList[module->type].statusWsFunction, "&%s=%d",
-                                        mdModList[module->type].statusInstanceName, module->instance);
+                    md_client_write_url(client, urls[index], mdModList[module->type].statusWsFunction, "&%s=%d", mdModList[module->type].statusInstanceName, module->instance);
                     urlArray[index] = urls[index];
                     ++index;
                 }
@@ -923,6 +913,7 @@ MDLoadedStatus md_courses_load_status(MDClient *client, MDArray courses, MDError
             if (!*error) {
                 mdModList[statusRef->module->type].statusParseFunc(json, statusRef, error);
             }
+            json_value_free(json);
         }
         for (int i = 0; i < count; ++i) {
             free(data[i]);
@@ -1058,18 +1049,17 @@ void md_mod_workshop_parse_status(json_value *json, MDStatusRef *statusRef, MDEr
 void md_loaded_status_apply(MDLoadedStatus status) {
     for (int i = 0; i < status.internalReferences.len; ++i) {
         MDStatusRef *statusRef = &MD_ARR(status.internalReferences, MDStatusRef)[i];
-        switch (statusRef->module->type)
-        {
-        case MD_MOD_ASSIGNMENT:
-            statusRef->module->contents.assignment.status = statusRef->status.assignment;
-            break;
+        switch (statusRef->module->type) {
+            case MD_MOD_ASSIGNMENT:
+                statusRef->module->contents.assignment.status = statusRef->status.assignment;
+                break;
 
-        case MD_MOD_WORKSHOP:
-            statusRef->module->contents.workshop.status = statusRef->status.workshop;
-            break;
-        
-        default:
-            break;
+            case MD_MOD_WORKSHOP:
+                statusRef->module->contents.workshop.status = statusRef->status.workshop;
+                break;
+
+            default:
+                break;
         }
     }
 }
