@@ -79,6 +79,7 @@ void test_vu_sso_auth(MDError *error) {
 }
 
 int main() {
+    md_init();
     bool cleanStatus = false, cleanClient = false, cleanCourses = false;
     MDError error = MD_ERR_NONE;
     char *token = get_token(&error);
@@ -251,6 +252,6 @@ end:
         md_client_cleanup(client);
     if (cleanCourses)
         md_courses_cleanup(courses);
-    curl_global_cleanup();
+    md_cleanup();
     return 0;
 }

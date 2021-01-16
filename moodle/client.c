@@ -65,6 +65,14 @@ MDMod mdModList[MD_MOD_COUNT] = {
     },
 };
 
+void md_init() {
+    curl_global_init(CURL_GLOBAL_ALL);
+}
+
+void md_cleanup() {
+    curl_global_cleanup();
+}
+
 MDClient *md_client_new(cchar *token, cchar *website, MDError *error) {
     *error = MD_ERR_NONE;
     MDClient *client = (MDClient *)md_malloc(sizeof(MDClient), error);

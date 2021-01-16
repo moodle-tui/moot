@@ -12,6 +12,11 @@
 #include "moodle.h"
 #include "auth.h"
 
+#define DEBUG(var)                                                                             \
+    printf("DBG: %s = ", #var);                                                                \
+    printf(_Generic(var, int : "%d", char * : "%s", const char * : "%s", time_t: "%ld", default : "?"), var); \
+    printf("\n");
+
 // Macro for zero initializer of a MDArray
 #define MD_ARRAY_INITIALIZER {.len = 0, ._data = NULL}
 

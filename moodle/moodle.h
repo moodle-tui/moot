@@ -14,6 +14,10 @@
  * Another example is the code in folder ui, which is a more complicated example
  * of how this library can be used to make an user interface, developed by
  * Ramojus Lapinskas.
+ *
+ * This library depends on LIBCURL. Therefore the user of this library is
+ * responsible to call curl_global_init(CURL_GLOBAL_ALL) at the start and (more
+ * importantly) curl_global_cleanup().
  */
 
 #ifndef __MOODLE_H
@@ -23,10 +27,12 @@
 #include <stdio.h>
 #include "stdbool.h"
 
-#define DEBUG(var)                                                                             \
-    printf("DBG: %s = ", #var);                                                                \
-    printf(_Generic(var, int : "%d", char * : "%s", const char * : "%s", time_t: "%ld", default : "?"), var); \
-    printf("\n");
+
+// Before using any of the library functions, one must call md_init to initialize it.
+void md_init();
+
+// When done using the library, user should free the resources using md_cleanup.
+void md_cleanup();
 
 // MDArray is generic array. When accessing elements, it should be casted using
 // macro MD_ARR; E. g.: Array numbers = MD_MAKE_ARR(int, 1, 2, 3);
