@@ -2,18 +2,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 
 #include "internal.h"
 #include "json.h"
 #include "moodle.h"
 
-// printf with a newline
-#define println(format, ...) printf(format "\n", ##__VA_ARGS__)
-
 // similar to assert, but instead of terminating makes a goto to end;
 #define assertend(expr)                                         \
     if (!(expr)) {                                              \
-        println("Assert failed: %s\nline:%d", #expr, __LINE__); \
+        printf("Assert failed: %s\nline:%d\n", #expr, __LINE__); \
         goto end;                                               \
     }
 
@@ -32,11 +30,11 @@ char *get_token(MDError *error) {
                                   error);
     char *token = NULL;
     if (!*error) {
-        json_value *json = md_parse_moodle_json(data, error);
+        Json *json = md_parse_moodle_json(data, error);
         if (!*error) {
             token = json_get_string(json, "token", error);
         }
-        json_value_free(json);
+        md_cleanup_json(json);
     }
     free(data);
     return token;
@@ -61,7 +59,7 @@ int fread_line(FILE *f, char *s, int n) {
 }
 
 void test_vu_sso_auth(MDError *error) {
-    println("Testing login to VU system");
+    printf("Testing login to VU system\n");
     char username[CREDENTIALS_LENGTH], password[CREDENTIALS_LENGTH];
     printf("username: ");
     fread_line(stdin, username, CREDENTIALS_LENGTH);
@@ -86,13 +84,13 @@ int main() {
     if (error)
         goto end;
 
-    println("Creating client");
+    printf("Creating client\n");
     MDClient *client = md_client_new(token, DEMO_SITE, &error);
     cleanClient = true;
     if (error)
         goto end;
 
-    println("Initializing client");
+    printf("Initializing client\n");
     md_client_init(client, &error);
     if (error)
         goto end;
@@ -103,25 +101,25 @@ int main() {
         client = md_client_load_from_file(SAVE_FILE, &error);
     }
     assertend(error == MD_ERR_NONE);
-    println("Client information:");
-    println("Site: %s", client->siteName);
-    println("Name: %s", client->fullName);
+    printf("Client information:\n");
+    printf("Site: %s\n", client->siteName);
+    printf("Name: %s\n", client->fullName);
     assertend(!strcmp(client->siteName, "Mount Orange School"));
     assertend(!strcmp(client->fullName, "Mark Ellis"));
     assertend(client->uploadLimit > 0);
 
-    println("Accepting policy");
-    json_value_free(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
+    printf("Accepting policy\n");
+    md_cleanup_json(md_client_do_http_json_request(client, &error, "core_user_agree_site_policy", ""));
     if (error)
         goto end;
 
-    println("Fetching courses");
+    printf("Fetching courses\n");
     MDArray courses = md_client_fetch_courses(client, &error);
     cleanCourses = true;
     if (error)
         goto end;
 
-    println("Checking specific modules");
+    printf("Checking specific modules\n");
     MDModule *assignment1 = md_courses_locate_module(courses, 66, 788, 119, &error);
     MDModule *assignment2 = md_courses_locate_module(courses, 56, 573, 95, &error);
     if (error)
@@ -137,19 +135,19 @@ int main() {
     assertend(workshop1->type == MD_MOD_WORKSHOP);
     assertend(strcmp(workshop1->name, "Simulation -  Remake the film!") == 0);
 
-    println("Validating data");
+    printf("Validating data\n");
     for (int i = 0; i < courses.len; ++i) {
         MDCourse *course = &MD_COURSES(courses)[i];
         teststr(course->name);
-        println("%s", course->name);
+        printf("%s\n", course->name);
         for (int j = 0; j < course->topics.len; ++j) {
             MDTopic *topic = &MD_TOPICS(course->topics)[j];
-            println(" - %s", topic->name);
+            printf(" - %s\n", topic->name);
             teststr(topic->name);
             teststr(topic->summary.text);
             for (int k = 0; k < topic->modules.len; ++k) {
                 MDModule *module = &MD_MODULES(topic->modules)[k];
-                println("    - %s %d", module->name, module->instance);
+                printf("    - %s %d\n", module->name, module->instance);
                 teststr(module->name);
                 switch (module->type) {
                     case MD_MOD_ASSIGNMENT:
@@ -184,34 +182,34 @@ int main() {
         }
     }
 
-    println("Testing module assignment submission");
+    printf("Testing module assignment submission\n");
     md_client_mod_assign_submit(client, assignment1, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"),
                                 &(MDRichText){"- -", MD_FORMAT_MARKDOWN}, &error);
     md_client_mod_assign_submit(client, assignment2, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), NULL, &error);
     if (error)
         goto end;
-    println("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d", assignment1->id);
-    println("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d", assignment2->id);
+    printf("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d\n", assignment1->id);
+    printf("Ok. Check for success on " DEMO_SITE "/mod/assign/view.php?id=%d\n", assignment2->id);
 
-    println("Testing module workshop submission");
+    printf("Testing module workshop submission\n");
     md_client_mod_workshop_submit(client, workshop1, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), NULL, "Tit le", &error);
     if (error) {
-        println("Error: %s", md_error_get_message(error));
+        printf("Error: %s\n", md_error_get_message(error));
         if (error == MD_ERR_MOODLE_EXCEPTION) {
-            println("This may be caused by the workshop being already submitted.");
+            printf("This may be caused by the workshop being already submitted.\n");
         } else {
             goto end;
         }
     }
-    println("Ok. Check for success on " DEMO_SITE "/mod/workshop/view.php?id=%d", workshop1->id);
+    printf("Ok. Check for success on " DEMO_SITE "/mod/workshop/view.php?id=%d\n", workshop1->id);
 
-    println("Loading status of modules");
+    printf("Loading status of modules\n");
     MDLoadedStatus status = md_courses_load_status(client, courses, &error);
     cleanStatus = true;
     if (error)
         goto end;
     md_loaded_status_apply(status);
-    println("Checking the correctness of loaded status");
+    printf("Checking the correctness of loaded status\n");
 
     // existing assignment
     MDModule *assignment3 = md_courses_locate_module(courses, 62, 724, 111, &error);
@@ -241,7 +239,7 @@ end:
     if (error)
         printf("Error: %s\n", md_error_get_message(error));
     else
-        println("Done");
+        printf("Done\n");
 
     // Cleaning up.
     free(token);

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2020 Nojus Gudinavičius
  * nojus.gudinavicius@gmail.com
- * https://github.com/moodle-tui/moot
+ * Licensed as with https://github.com/moodle-tui/moot
  */
 
 #ifndef __MT_INTERNAL_H
@@ -97,22 +97,29 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error);
 // chunks and returning allocated memory which needs to be freed later.
 char *fread_string(FILE *file, MDError *error);
 
+// md_parse_json allocates space for json object and parses given data. The
+// caller is responsible to free using md_cleanup_json.
+Json *md_parse_json(cchar *data, MDError *error);
+
+// md_cleanup_json deallocates json parsed using md_parse_json.
+void md_cleanup_json(Json *json);
+
 // json_get_property_silent finds and returns a property of json object if
 // found, NULL otherwise.
-json_value *json_get_property_silent(json_value *json, cchar *key);
+Json *json_get_property_silent(Json *json, cchar *key);
 
 // json_get_property finds and returns a property of json object with specific
 // type.
-json_value *json_get_property(json_value *json, cchar *key, json_type type, MDError *error);
+Json *json_get_property(Json *json, cchar *key, JsonType type, MDError *error);
 
 // json getters for specific types:
 
-long json_get_integer(json_value *json, cchar *key, MDError *error);
-int json_get_bool(json_value *json, cchar *key, MDError *error);
-char *json_get_string(json_value *json, cchar *key, MDError *error);
-cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error);
-json_value *json_get_array(json_value *json, cchar *key, MDError *error);
-json_value *json_get_object(json_value *json, cchar *key, MDError *error);
+long json_get_integer(Json *json, cchar *key, MDError *error);
+int json_get_bool(Json *json, cchar *key, MDError *error);
+char *json_get_string(Json *json, cchar *key, MDError *error);
+cchar *json_get_string_no_alloc(Json *json, cchar *key, MDError *error);
+Json *json_get_array(Json *json, cchar *key, MDError *error);
+Json *json_get_object(Json *json, cchar *key, MDError *error);
 
 // Authentication
 
@@ -134,18 +141,22 @@ typedef struct MDStatusRef {
     } status;
 } MDStatusRef;
 
-void md_mod_assign_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error);
-void md_mod_workshop_parse_status(json_value *json, MDStatusRef *statusRef, MDError *error);
+void md_mod_assign_parse_status(Json *json, MDStatusRef *statusRef, MDError *error);
+void md_mod_workshop_parse_status(Json *json, MDStatusRef *statusRef, MDError *error);
+
+// The following two functions use struct pointers instead of void pointers so
+// they are compatible with possible types (at least I hope so).
+// stackoverflow.com/a/559671
 
 // MDInitFunc is the callback called by md_array_init_new for each created element.
-typedef void (*MDInitFunc)(void *);
+typedef void (*MDInitFunc)(struct MDModule *);
 
 // MDInitFunc is the callback called by md_array_cleanup for each created element.
-typedef void (*MDCleanupFunc)(void *);
+typedef void (*MDCleanupFunc)(struct MDModule *);
 
-typedef void (*MDParseFunc)(MDClient *client, MDArray courses, json_value *json, MDError *error);
+typedef void (*MDParseFunc)(MDClient *client, MDArray courses, Json *json, MDError *error);
 
-typedef void (*MDStatusParseFunc)(json_value *data, MDStatusRef *statusRef, MDError *error);
+typedef void (*MDStatusParseFunc)(Json *data, MDStatusRef *statusRef, MDError *error);
 
 typedef struct MDMod {
     MDModType type;
@@ -174,14 +185,14 @@ int md_client_write_url_varg(MDClient *client, char *url, cchar *wsfunction, cch
 // md_client_do_http_json_request makes a request to Moodle webservice to
 // specific function, caching Moodle exceptions.
 // @return json result, must be freed by the caller.
-json_value *md_client_do_http_json_request(MDClient *client, MDError *error, char *wsfunction, cchar *format, ...);
+Json *md_client_do_http_json_request(MDClient *client, MDError *error, char *wsfunction, cchar *format, ...);
 
 // md_get_mod_type returns module type from Moodle module name.
 MDModType md_get_mod_type(cchar *module);
 
 // md_parse_moodle_json parses json, looking for Moodle exceptions.
 // @return json result, must be freed by the caller.
-json_value *md_parse_moodle_json(char *data, MDError *error);
+Json *md_parse_moodle_json(char *data, MDError *error);
 
 // md_client_upload_file uploads a file to Moodle server. If itemId is not
 // MD_NO_ITEM_ID, file is uploaded to the same pool as the file specified with
@@ -195,7 +206,7 @@ long md_client_upload_file(MDClient *client, cchar *filename, long itemId, MDErr
 long md_client_upload_files(MDClient *client, MDArray filenames, MDError *error);
 
 // md_find_moodle_warning returns the first found warning in the json or NULL;
-cchar *md_find_moodle_warning(json_value *json);
+cchar *md_find_moodle_warning(Json *json);
 
 // initialization to default values and cleanup functions for various datatypes:
 
@@ -229,19 +240,19 @@ void md_courses_fetch_topic_contents(MDClient *client, MDArray courses, MDError 
 
 // md_parse_modules parses and returns modules from given json.
 // @return MDArray with elements of type MDModule.
-MDArray md_parse_modules(json_value *json, MDError *error);
+MDArray md_parse_modules(Json *json, MDError *error);
 
 // md_parse_topics parses and returns topics from given json.
 // @return MDArray with elements of type MDTopic.
-MDArray md_parse_topics(json_value *json, MDError *error);
+MDArray md_parse_topics(Json *json, MDError *error);
 
 // md_parse_files parses and returns files from given json.
 // @return MDArray with elements of type MDFile.
-MDArray md_parse_files(json_value *json, MDError *error);
+MDArray md_parse_files(Json *json, MDError *error);
 
 // md_parse_mod_assignment_plugins parses settings for mod assignment out of given
 // json, as they have different syntax from the rest.
-void md_parse_mod_assignment_plugins(json_value *configs, MDModAssignment *assignment, MDError *error);
+void md_parse_mod_assignment_plugins(Json *configs, MDModAssignment *assignment, MDError *error);
 
 // md_course_locate_module locates and returns pointer to a module with matching
 // properties if it exists in the given courses array.
@@ -250,14 +261,14 @@ MDModule *md_courses_locate_module(MDArray courses, int courseId, int moduleId, 
 // md_courses_locate_json_module similar to md_courses_locate_module, but data
 // needed to identify module is extracted from given json. Json property name
 // of module id should also be suplied (usually cmid or coursemodule).
-MDModule *md_courses_locate_json_module(MDArray courses, json_value *json, cchar *moduleIdJsonName, MDError *error);
+MDModule *md_courses_locate_json_module(MDArray courses, Json *json, cchar *moduleIdJsonName, MDError *error);
 
 // for efficiency, data for modules is fetched at once and then applied to
 // courses using following functions:
 
-void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
-void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
-void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
-void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, json_value *json, MDError *error);
+void md_client_courses_set_mod_assignment_data(MDClient *client, MDArray courses, Json *json, MDError *error);
+void md_client_courses_set_mod_workshop_data(MDClient *client, MDArray courses, Json *json, MDError *error);
+void md_client_courses_set_mod_resource_data(MDClient *client, MDArray courses, Json *json, MDError *error);
+void md_client_courses_set_mod_url_data(MDClient *client, MDArray courses, Json *json, MDError *error);
 
 #endif

@@ -12,7 +12,7 @@ void md_array_append(MDArray *array, const void *elem, size_t size, MDError *err
     ++array->len;
     array->_data = md_realloc(array->_data, array->len * size, error);
     if (!*error) {
-        memcpy(array->_data + (array->len - 1) * size, elem, size);
+        memcpy((void*)((char *)array->_data + (array->len - 1) * size), elem, size);
     }
 }
 
@@ -268,19 +268,37 @@ char *fread_string(FILE *file, MDError *error) {
     return output;
 }
 
-json_value *json_get_property_silent(json_value *json, cchar *key) {
-    if (json->type != json_object)
+Json *md_parse_json(cchar *data, MDError *error) {
+    Json *json = md_malloc(sizeof(Json), error);
+    if (json) {
+        if (json_parse(json, data)) {
+            *error = MD_ERR_INVALID_JSON;
+            json = NULL;
+        }
+    }
+    return json;
+}
+
+void md_cleanup_json(Json *json) {
+    if (json) {
+        json_cleanup(json);
+        free(json);
+    }
+}
+
+Json *json_get_property_silent(Json *json, cchar *key) {
+    if (json->type != JSON_OBJECT)
         return NULL;
-    for (int i = 0; i < json->u.object.length; ++i) {
-        if (strcmp(json->u.object.values[i].name, key) == 0) {
-            return json->u.object.values[i].value;
+    for (int i = 0; i < json->object.len; ++i) {
+        if (strcmp(json->object.entries[i].key.str, key) == 0) {
+            return &json->object.entries[i].value;
         }
     }
     return NULL;
 }
 
-json_value *json_get_property(json_value *json, cchar *key, json_type type, MDError *error) {
-    json_value *value = json_get_property_silent(json, key);
+Json *json_get_property(Json *json, cchar *key, JsonType type, MDError *error) {
+    Json *value = json_get_property_silent(json, key);
     if (value) {
         if (value->type != type) {
             *error = MD_ERR_INVALID_JSON_VALUE;
@@ -294,46 +312,46 @@ json_value *json_get_property(json_value *json, cchar *key, json_type type, MDEr
     return value;
 }
 
-long json_get_integer(json_value *json, cchar *key, MDError *error) {
-    json_value *value = json_get_property(json, key, json_integer, error);
+long json_get_integer(Json *json, cchar *key, MDError *error) {
+    Json *value = json_get_property(json, key, JSON_NUMBER, error);
     if (value)
-        return value->u.integer;
+        return value->number;
     return 0;
 }
 
-int json_get_bool(json_value *json, cchar *key, MDError *error) {
-    json_value *value = json_get_property(json, key, json_boolean, error);
+int json_get_bool(Json *json, cchar *key, MDError *error) {
+    Json *value = json_get_property(json, key, JSON_BOOLEAN, error);
     if (value)
-        return value->u.boolean;
+        return value->boolean;
     return 0;
 }
 
-char *json_get_string(json_value *json, cchar *key, MDError *error) {
+char *json_get_string(Json *json, cchar *key, MDError *error) {
     MDError prev = *error;
-    json_value *value = json_get_property(json, key, json_string, error);
+    Json *value = json_get_property(json, key, JSON_STRING, error);
     if (*error == MD_ERR_INVALID_JSON_VALUE) {
-        value = json_get_property(json, key, json_null, error);
+        value = json_get_property(json, key, JSON_NULL, error);
         if (value) {
             *error = prev;
             return NULL;
         }
     }
     if (value)
-        return clone_str(value->u.string.ptr, error);
+        return clone_str(value->string.str, error);
     return NULL;
 }
 
-cchar *json_get_string_no_alloc(json_value *json, cchar *key, MDError *error) {
-    json_value *value = json_get_property(json, key, json_string, error);
+cchar *json_get_string_no_alloc(Json *json, cchar *key, MDError *error) {
+    Json *value = json_get_property(json, key, JSON_STRING, error);
     if (value)
-        return value->u.string.ptr;
+        return value->string.str;
     return NULL;
 }
 
-json_value *json_get_array(json_value *json, cchar *key, MDError *error) {
-    return json_get_property(json, key, json_array, error);
+Json *json_get_array(Json *json, cchar *key, MDError *error) {
+    return json_get_property(json, key, JSON_ARRAY, error);
 }
 
-json_value *json_get_object(json_value *json, cchar *key, MDError *error) {
-    return json_get_property(json, key, json_object, error);
+Json *json_get_object(Json *json, cchar *key, MDError *error) {
+    return json_get_property(json, key, JSON_OBJECT, error);
 }

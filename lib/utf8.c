@@ -47,6 +47,7 @@ typedef uint_least32_t Rune;
 
 static Rune utf8decodebyte(char, size_t*);
 static size_t utf8validate(Rune*, size_t);
+static char utf8encodebyte(Rune, size_t);
 
 /* Arbitrary sizes */
 #define UTF_INVALID 0xFFFD
@@ -108,4 +109,24 @@ size_t utf8validate(Rune* u, size_t i) {
         ;
 
     return i;
+}
+
+size_t utf8encode(Rune u, char* c) {
+    size_t len, i;
+
+    len = utf8validate(&u, 0);
+    if (len > UTF_SIZ)
+        return 0;
+
+    for (i = len - 1; i != 0; --i) {
+        c[i] = utf8encodebyte(u, 0);
+        u >>= 6;
+    }
+    c[0] = utf8encodebyte(u, len);
+
+    return len;
+}
+
+char utf8encodebyte(Rune u, size_t i) {
+    return utfbyte[i] | (u & ~utfmask[i]);
 }

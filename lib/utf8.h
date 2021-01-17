@@ -7,5 +7,6 @@
 typedef uint_least32_t Rune;
 
 size_t utf8decode(const char*, Rune*, size_t);
+size_t utf8encode(Rune, char*);
 
 #endif
