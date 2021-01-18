@@ -5,9 +5,8 @@
 #include <string.h>
 
 #include "config.h"
-#include "cfgLocal.h"
 
-void readConfigFile(ConfigValues *configValues, CFGError *error) {
+void readConfigFile(ConfigValues *configValues, Error *error) {
     *error = CFG_ERR_NONE;
 
     char *configPath = getConfigPath(error);
@@ -30,7 +29,7 @@ void readConfigFile(ConfigValues *configValues, CFGError *error) {
     fclose(configFile);
 }
 
-char *getConfigPath(CFGError *error) {
+char *getConfigPath(Error *error) {
     char *sysConfigHome = getenv(CONFIG_HOME_ENV);
     if (!sysConfigHome) {
         *error = CFG_ERR_GET_ENV;
@@ -41,12 +40,12 @@ char *getConfigPath(CFGError *error) {
     return configPath;
 }
 
-FILE *openConfigFile(char *configPath, CFGError *error) {
+FILE *openConfigFile(char *configPath, Error *error) {
     errno = 0;
     FILE *configFile = fopen(configPath, "a+");
     if (!configFile) {
         *error = CFG_ERR_OPEN_FILE;
-        cfg_error_set_message(strerror(errno));
+        app_error_set_message(strerror(errno));
     }
     return configFile;
 }
@@ -58,7 +57,7 @@ char *joinPaths(char *string1, char *string2) {
     return result;
 }
 
-void processLine(char *line, ConfigValues *configValues, CFGError *error) {
+void processLine(char *line, ConfigValues *configValues, Error *error) {
     int readPos = 0;
     char *propertyStr = sreadProperty(line, &readPos, error);
     if (*error)
@@ -72,29 +71,29 @@ void processLine(char *line, ConfigValues *configValues, CFGError *error) {
     sreadValue(configValues, property, line, &readPos, error);
 }
 
-void xmalloc(void **var, size_t size, CFGError *error) {
+void xmalloc(void **var, size_t size, Error *error) {
     *var = malloc(size);
     if (!*var)
         *error = CFG_ERR_ALLOCATE;
 }
 
-char *sreadProperty(char *line, int *readPos, CFGError *error) {
-    char *propertyStr = sreadUntil(line, SEPERATOR, LINE_LIMIT, readPos);
+char *sreadProperty(char *line, int *readPos, Error *error) {
+    char *propertyStr = sreadUntil(line, CFG_SEPERATOR, LINE_LIMIT, readPos);
     ++readPos;
     if (!propertyStr) {
         *error = CFG_ERR_NO_VALUE;
-        cfg_error_set_message(line);
+        app_error_set_message(line);
     }
     return propertyStr;
 }
 
-Property getProperty(char *propertyStr, CFGError *error) {
+Property getProperty(char *propertyStr, Error *error) {
     for (Property i = 0; i < NR_OF_PROPERTIES; ++i) {
         if (!strcmp(propertyStr, properties[i]))
             return i;
     }
     *error = CFG_ERR_WRONG_PROPERTY;
-    cfg_error_set_message(propertyStr);
+    app_error_set_message(propertyStr);
     return -1;
 }
 
@@ -102,13 +101,15 @@ void skipSeperator(int *readPos) {
     ++*readPos;
 }
 
-void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, CFGError *error) {
+void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Error *error) {
     switch (property) {
         case PROPERTY_TOKEN:
             configValues->token = sreadUntil(line, '\n', LINE_LIMIT, readPos);
             if (!configValues->token)
                 *error = CFG_ERR_NO_TOKEN;
             break;
+        case PROPERTY_UPLOAD_COMMAND:
+            configValues->uploadCommand = sreadUntil(line, '\n', LINE_LIMIT, readPos);
         default:
             break;
     }
