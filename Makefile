@@ -44,6 +44,11 @@ TEST = moodle/test/test
 test: $(MOODLE_OBJ) $(LIB_OBJ) vu_sso_plugin
 	$(CC) $(CCFLAGS) $(TEST).c $(MOODLE_OBJ) $(LIB_OBJ) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(TEST)
 
+JSON_TEST = lib/tests/json
+json_test: $(LIB)/json.o $(LIB)/utf8.o
+	$(CC) $(CCFLAGS) $(JSON_TEST).c $^ $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(JSON_TEST)
+
+
 VU_SSO = $(PLUGINS)/vu_sso
 vu_sso_plugin: $(LIB)/base64.o
 	$(CC) $(CCFLAGS) -shared $(VU_SSO).c $^ $(INCLUDE_LIB) $(INCLUDE_MOODLE) $(LDLIBS) $(LIBS) -o $(VU_SSO).$(PLUGIN_EXT)
@@ -55,5 +60,6 @@ clean:
 	$(RM) $(TARGET)
 	$(RM) $(TEST)
 	$(RM) $(VU_SSO).$(PLUGIN_EXT)
+	$(RM) $(JSON_TEST)
 
 .PHONY: all $(LIB) $(MOODLE) moot clean test vu_sso_plugin

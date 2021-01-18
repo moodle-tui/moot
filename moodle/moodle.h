@@ -25,7 +25,7 @@
 
 #include <time.h>
 #include <stdio.h>
-#include "stdbool.h"
+#include <stdbool.h>
 
 
 // Before using any of the library functions, one must call md_init to initialize it.
@@ -102,7 +102,7 @@ typedef struct MDArray {
 // match the sizes of previous elements, or behaviour is undefined. This
 // function will not work with arrays made with MD_MAKE_ARR... macros, because
 // the memory there is static.
-void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error);
+void md_array_append(MDArray *array, const void *ptr, size_t size, MDError *error);
 
 // md_array_free frees and resets the dinamically allocated array (using
 // function md_array_append). Keep in mind that elements are not be freed.
@@ -323,7 +323,7 @@ void md_client_cleanup(MDClient *client);
 
 // md_client_fetch_courses gets all the courses from the moodle server. Returned courses should
 // be cleaned up later using md_courses_cleanup.
-MDArray md_client_fetch_courses(MDClient *client, MDError *error);
+MDArray md_client_fetch_courses(MDClient *client, bool sortByName, MDError *error);
 
 // md_courses_cleanup releases all the resources owned by the list of courses.
 // @param courses MDArray with elements of type MDCourse.

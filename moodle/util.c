@@ -8,11 +8,11 @@
 #define CURL_MAX_PARALLEL 20
 #define FREAD_CHUNK_SIZE 4096
 
-void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error) {
+void md_array_append(MDArray *array, const void *ptr, size_t size, MDError *error) {
     ++array->len;
     array->_data = md_realloc(array->_data, array->len * size, error);
     if (array->_data) {
-        memcpy((char *)array->_data + (array->len - 1) * size, elem, size);
+        memcpy((char *)array->_data + (array->len - 1) * size, ptr, size);
     }
 }
 
@@ -273,6 +273,30 @@ char *fread_string(FILE *file, MDError *error) {
     }
 
     return output;
+}
+
+void merge(char *left, char *right, char *end, char *buffer, size_t size, compFunc comp) {
+    for (char *l = left, *r = right; l < right || r < end; buffer += size) {
+        char **value = r == end || (l < right && comp(l, r) < 0) ? &l : &r;
+        memcpy(buffer, *value, size);
+        *value += size;
+    }
+    memcpy(left, buffer - (end - left), end - left);
+}
+
+void sort(void *array, size_t count, size_t size, compFunc comp) {
+    // Switch to char for easier pointer arithmetics.
+    char *arr = array, *end = arr + count * size, buffer[end - arr];
+
+    for (size_t unit = 1; unit < count; unit *= 2) {
+        for (size_t i = 0; i + unit < count; i += unit * 2) {
+            char *rightEnd = arr + (i + 2 * unit) * size;
+            if (rightEnd > end) {
+                rightEnd = end;
+            }
+            merge(arr + i * size, arr + (i + unit) * size, rightEnd, buffer, size, comp);
+        }
+    }
 }
 
 Json *md_parse_json(cchar *data, MDError *error) {

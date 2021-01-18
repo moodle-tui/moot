@@ -328,7 +328,7 @@ JsonRet json_parse_number(JsonNumber *number, const char *data) {
     if (*data == '.') {
         ++data;
         if (!is_digit(*data)) {
-            return JSON_ERR_NUMBER_INVALID_DIGIT;
+            return JSON_ERR_NUMBER_INVALID_DECIMAL;
         }
         while (is_digit(*data)) {
             ++data;

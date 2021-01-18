@@ -92,6 +92,11 @@ char *http_post_file(cchar *url, cchar *filename, cchar *name, MDError *error);
 // chunks and returning allocated memory which needs to be freed later.
 char *fread_string(FILE *file, MDError *error);
 
+// compFunc should return < 0 if a should go before b, and > 0 if b should go before a.
+typedef int (*compFunc)(const void *a, const void *b);
+
+void sort(void *array, size_t count, size_t size, compFunc comp);
+
 // md_parse_json allocates space for json object and parses given data. The
 // caller is responsible to free using md_cleanup_json.
 Json *md_parse_json(cchar *data, MDError *error);

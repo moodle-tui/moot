@@ -22,7 +22,7 @@
     { &client->fullName, &client->siteName, &client->token, &client->website }
 
 // List of known modules. Order is important. Indeces should match the types (MDModType).
-MDMod mdModList[MD_MOD_COUNT] = {
+static MDMod mdModList[MD_MOD_COUNT] = {
     {
         .type = MD_MOD_ASSIGNMENT,
         .name = "assign",
@@ -187,8 +187,13 @@ void md_client_init(MDClient *client, MDError *error) {
     md_cleanup_json(json);
 }
 
-MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
-    *error = MD_ERR_NONE;
+static int compareByCourseName(const void *a, const void *b) {
+    const char *s1 = ((MDCourse*)a)->name, *s2 = ((MDCourse*)b)->name;
+    // Skip leading whitespaces.
+    return strcmp(s1 + strspn(s1, " "), s2 + strspn(s2, " "));
+}
+
+MDArray md_client_fetch_courses(MDClient *client, bool sortByName, MDError *error) {    *error = MD_ERR_NONE;
     Json *jsonCourses = md_client_do_http_json_request(client, error, "core_enrol_get_users_courses", "&userid=%d", client->userid);
 
     MDArray courses;
@@ -223,6 +228,9 @@ MDArray md_client_fetch_courses(MDClient *client, MDError *error) {
     }
     md_courses_fetch_topic_contents(client, courses, error);
     md_cleanup_json(jsonCourses);
+    if (sortByName) {
+        sort(courses._data, courses.len, sizeof(MDCourse), compareByCourseName);
+    }
     return courses;
 }
 

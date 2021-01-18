@@ -1,18 +1,18 @@
 #include <curl/curl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdlib.h>
 
 #include "internal.h"
 #include "json.h"
 #include "moodle.h"
 
 // similar to assert, but instead of terminating makes a goto to end;
-#define assertend(expr)                                         \
-    if (!(expr)) {                                              \
+#define assertend(expr)                                          \
+    if (!(expr)) {                                               \
         printf("Assert failed: %s\nline:%d\n", #expr, __LINE__); \
-        goto end;                                               \
+        goto end;                                                \
     }
 
 // Checks if a string is valid.
@@ -114,7 +114,7 @@ int main() {
         goto end;
 
     printf("Fetching courses\n");
-    MDArray courses = md_client_fetch_courses(client, &error);
+    MDArray courses = md_client_fetch_courses(client, true, &error);
     cleanCourses = true;
     if (error)
         goto end;
@@ -183,8 +183,7 @@ int main() {
     }
 
     printf("Testing module assignment submission\n");
-    md_client_mod_assign_submit(client, assignment1, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"),
-                                &(MDRichText){"- -", MD_FORMAT_MARKDOWN}, &error);
+    md_client_mod_assign_submit(client, assignment1, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), &(MDRichText){"- -", MD_FORMAT_MARKDOWN}, &error);
     md_client_mod_assign_submit(client, assignment2, &MD_MAKE_ARR(cchar *, "moodle/test/test_file.txt"), NULL, &error);
     if (error)
         goto end;
@@ -219,8 +218,7 @@ int main() {
     assertend(assignment3->contents.assignment.status.submitDate == 1407676072);
     assertend(strcmp(assignment3->contents.assignment.status.grade, "55.00 / 100.00") == 0);
     assertend(assignment3->contents.assignment.status.submittedFiles.len > 0);
-    assertend(strcmp(MD_FILES(assignment3->contents.assignment.status.submittedFiles)[0].filename,
-                     "CinemaSpec_ME267.pdf") == 0);
+    assertend(strcmp(MD_FILES(assignment3->contents.assignment.status.submittedFiles)[0].filename, "CinemaSpec_ME267.pdf") == 0);
 
     // existing workshop
     MDModule *workshop2 = md_courses_locate_module(courses, 56, 575, 10, &error);
