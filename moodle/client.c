@@ -188,12 +188,13 @@ void md_client_init(MDClient *client, MDError *error) {
 }
 
 static int compareByCourseName(const void *a, const void *b) {
-    const char *s1 = ((MDCourse*)a)->name, *s2 = ((MDCourse*)b)->name;
+    const char *s1 = ((MDCourse *)a)->name, *s2 = ((MDCourse *)b)->name;
     // Skip leading whitespaces.
     return strcmp(s1 + strspn(s1, " "), s2 + strspn(s2, " "));
 }
 
-MDArray md_client_fetch_courses(MDClient *client, bool sortByName, MDError *error) {    *error = MD_ERR_NONE;
+MDArray md_client_fetch_courses(MDClient *client, bool sortByName, MDError *error) {
+    *error = MD_ERR_NONE;
     Json *jsonCourses = md_client_do_http_json_request(client, error, "core_enrol_get_users_courses", "&userid=%d", client->userid);
 
     MDArray courses;
@@ -214,10 +215,10 @@ MDArray md_client_fetch_courses(MDClient *client, bool sortByName, MDError *erro
                 // only topics or weeks format courses are supported
                 if (format && strcmp(format, "topics") && strcmp(format, "weeks")) {
                     ++skip;
-                    continue;
+                } else {
+                    courseArr[i - skip].id = json_get_integer(course, "id", error);
+                    courseArr[i - skip].name = json_get_string(course, "fullname", error);
                 }
-                courseArr[i - skip].id = json_get_integer(course, "id", error);
-                courseArr[i - skip].name = json_get_string(course, "fullname", error);
             }
             courses.len -= skip;
         } else {
@@ -244,7 +245,7 @@ void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callb
         array->_data = md_malloc(length * size, error);
         if (array->_data && callback) {
             for (int i = 0; i < length; ++i) {
-                callback((void*)((char *)array->_data + i * size));
+                callback((void *)((char *)array->_data + i * size));
             }
         }
     } else {
@@ -255,7 +256,7 @@ void md_array_init_new(MDArray *array, size_t size, int length, MDInitFunc callb
 void md_array_cleanup(MDArray *array, size_t size, MDCleanupFunc callback) {
     if (callback) {
         for (int i = 0; i < array->len; ++i)
-            callback((void*)((char *)array->_data + i * size));
+            callback((void *)((char *)array->_data + i * size));
     }
     free(array->_data);
     array->len = 0;
@@ -479,19 +480,18 @@ MDArray md_parse_modules(Json *json, MDError *error) {
         for (int i = 0; i < json->array.len && !*error; ++i) {
             Json *jsonModule = &json->array.values[i];
             bool userVisible = json_get_bool(jsonModule, "uservisible", error);
+            cchar *type = json_get_string_no_alloc(jsonModule, "modname", error);
+
             if (*error || !userVisible) {
                 ++skip;
-                continue;
-            }
-            cchar *type = json_get_string_no_alloc(jsonModule, "modname", error);
-            if (!type || (modules[i - skip].type = md_get_mod_type(type)) == MD_MOD_UNSUPPORTED) {
+            } else if (!type || (modules[i - skip].type = md_get_mod_type(type)) == MD_MOD_UNSUPPORTED) {
                 ++skip;
-                continue;
+            } else {
+                mdModList[modules[i - skip].type].initFunc(&modules[i - skip]);
+                modules[i - skip].name = json_get_string(jsonModule, "name", error);
+                modules[i - skip].id = json_get_integer(jsonModule, "id", error);
+                modules[i - skip].instance = json_get_integer(jsonModule, "instance", error);
             }
-            mdModList[modules[i - skip].type].initFunc(&modules[i - skip]);
-            modules[i - skip].name = json_get_string(jsonModule, "name", error);
-            modules[i - skip].id = json_get_integer(jsonModule, "id", error);
-            modules[i - skip].instance = json_get_integer(jsonModule, "instance", error);
         }
         modulesArr.len -= skip;
     } else {
@@ -658,9 +658,9 @@ void md_client_mod_assign_submit(MDClient *client, MDModule *assignment, MDArray
             return;
     }
     Json *json = md_client_do_http_json_request(client, error, "mod_assign_save_submission",
-                                                      "&assignmentid=%d"
-                                                      "%s",
-                                                      assignment->instance, params);
+                                                "&assignmentid=%d"
+                                                "%s",
+                                                assignment->instance, params);
 
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
@@ -689,10 +689,10 @@ void md_client_mod_workshop_submit(MDClient *client, MDModule *workshop, MDArray
     if (*error)
         return;
     Json *json = md_client_do_http_json_request(client, error, "mod_workshop_add_submission",
-                                                      "&workshopid=%d"
-                                                      "&title=%s"
-                                                      "%s",
-                                                      workshop->instance, title, params);
+                                                "&workshopid=%d"
+                                                "&title=%s"
+                                                "%s",
+                                                workshop->instance, title, params);
     free((char *)title);
     if (!*error) {
         cchar *message = md_find_moodle_warning(json);
@@ -708,14 +708,14 @@ MDModule *md_courses_locate_module(MDArray courses, int courseId, int moduleId, 
     // TODO: optimize for log n lookup
     for (int i = 0; i < courses.len; ++i) {
         MDCourse *course = &MD_COURSES(courses)[i];
-        if (course->id != courseId)
-            continue;
-        for (int j = 0; j < course->topics.len; ++j) {
-            MDTopic *topic = &MD_TOPICS(course->topics)[j];
-            for (int k = 0; k < topic->modules.len; ++k) {
-                MDModule *module = &MD_MODULES(topic->modules)[k];
-                if (module->instance == instance && module->id == moduleId) {
-                    return module;
+        if (course->id == courseId) {
+            for (int j = 0; j < course->topics.len; ++j) {
+                MDTopic *topic = &MD_TOPICS(course->topics)[j];
+                for (int k = 0; k < topic->modules.len; ++k) {
+                    MDModule *module = &MD_MODULES(topic->modules)[k];
+                    if (module->instance == instance && module->id == moduleId) {
+                        return module;
+                    }
                 }
             }
         }
@@ -994,35 +994,30 @@ void md_mod_assign_parse_status(Json *json, MDStatusRef *statusRef, MDError *err
         status->graded = json_get_bool(lastAttempt, "graded", error);
         status->submitDate = json_get_integer(submission, "timecreated", error);
         Json *plugins = json_get_array(submission, "plugins", error);
-        if (!*error) {
-            for (int i = 0; i < plugins->array.len && !*error; ++i) {
-                cchar *type = json_get_string_no_alloc(&plugins->array.values[i], "type", error);
-                if (*error)
-                    continue;
-                if (!strcmp(type, "file")) {
-                    Json *fileareas = json_get_array(&plugins->array.values[i], "fileareas", error);
-                    if (*error)
-                        continue;
-                    for (int j = 0; j < fileareas->array.len && !*error; ++j) {
-                        cchar *area = json_get_string_no_alloc(&fileareas->array.values[j], "area", error);
-                        if (*error || strcmp(area, "submission_files"))
-                            continue;
+        for (int i = 0; i < plugins->array.len && !*error; ++i) {
+            cchar *type = json_get_string_no_alloc(&plugins->array.values[i], "type", error);
+
+            if (!*error && !strcmp(type, "file")) {
+
+                Json *fileareas = json_get_array(&plugins->array.values[i], "fileareas", error);
+                for (int j = 0; j < fileareas->array.len && !*error; ++j) {
+
+                    cchar *area = json_get_string_no_alloc(&fileareas->array.values[j], "area", error);
+                    if (!*error && !strcmp(area, "submission_files")) {
                         Json *files = json_get_array(&fileareas->array.values[j], "files", error);
                         if (!*error) {
-                            md_array_cleanup(&status->submittedFiles, sizeof(MDFile), (MDCleanupFunc)md_file_cleanup);
                             status->submittedFiles = md_parse_files(files, error);
                         }
                     }
-                } else if (!strcmp(type, "onlinetext")) {
-                    Json *editorfields = json_get_array(&plugins->array.values[i], "editorfields", error);
-                    if (*error)
-                        continue;
-                    for (int j = 0; j < editorfields->array.len && !*error; ++j) {
-                        Json *jsonField = &editorfields->array.values[j];
-                        cchar *name = json_get_string_no_alloc(jsonField, "name", error);
-                        if (*error || strcmp(name, "onlinetext"))
-                            continue;
-                        md_rich_text_cleanup(&status->submittedText);
+                }
+            } else if (!*error && !strcmp(type, "onlinetext")) {
+
+                Json *editorfields = json_get_array(&plugins->array.values[i], "editorfields", error);
+                for (int j = 0; j < editorfields->array.len && !*error; ++j) {
+                    Json *jsonField = &editorfields->array.values[j];
+                    cchar *name = json_get_string_no_alloc(jsonField, "name", error);
+
+                    if (!*error && !strcmp(name, "onlinetext")) {
                         status->submittedText.text = json_get_string(jsonField, "text", error);
                         status->submittedText.format = json_get_integer(jsonField, "format", error);
                         break;
@@ -1034,7 +1029,6 @@ void md_mod_assign_parse_status(Json *json, MDStatusRef *statusRef, MDError *err
             Json *feedback = json_get_object(json, "feedback", error);
             if (!*error) {
                 status->grade = json_get_string(feedback, "gradefordisplay", error);
-                // printf("%s\n", status->grade);
                 str_replace(status->grade, "&nbsp;", " ");
                 status->gradeDate = json_get_integer(feedback, "gradeddate", error);
             }

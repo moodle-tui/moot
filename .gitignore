@@ -4,6 +4,7 @@
 .ccls
 .ccls-cache
 moodle/test/test
+lib/tests/json
 moot
 
 # compiled plugins
