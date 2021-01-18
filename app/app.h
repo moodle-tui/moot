@@ -1,14 +1,15 @@
-#ifndef UI_H
-#define UI_H
+#ifndef __APP_H
+#define __APP_H
 
 #include "moodle.h"
+
+typedef const char cchar;
+
+// ui.c
 
 #define EMPTY_OPTION_NAME "[empty]"
 #define OPTION_CUT_STR "~"
 #define SEPERATOR "  "
-#define DOWNLOAD_STARTED_MSG_COLOR BLUE
-#define DOWNLOAD_FINISHED_MSG_COLOR GREEN
-#define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
 #define NR_OF_WIDTHS 3
 #define SCROLLOFF 5
 
@@ -22,31 +23,6 @@ typedef enum Depth {
     LAST_DEPTH = 5,
 } Depth;
 
-typedef enum Action {
-    ACTION_INVALID = 0,
-    ACTION_DOWNLOAD = 1,
-    ACTION_QUIT = 2,
-    ACTION_GO_RIGHT = 3,
-    ACTION_GO_DOWN = 4,
-    ACTION_GO_LEFT = 5,
-    ACTION_GO_UP = 6,
-} Action;
-
-typedef enum KeyDef {
-    KD_RIGHT,
-    KD_DOWN,
-    KD_LEFT,
-    KD_UP,
-    KD_DOWNLOAD,
-    KD_QUIT,
-} KeyDef;
-
-//typedef struct menuInfo {
-//    int depth, *widths, HLOptions[MAX_DEPTH], currentMaxDepth, scrollOffset[MAX_DEPTH];
-//    _Bool isCurrentFile;
-//    MDClient *client;
-//} MenuInfo;
-
 typedef struct optionCoordinates {
     int height;
     Depth depth;
@@ -57,7 +33,7 @@ typedef struct Layout {
 } Layout;
 
 // mainLoop prints all the information and reacts to user input, until user decides to quit
-void mainLoop (MDArray courses, MDClient *client);
+void mainLoop (MDArray courses, MDClient *client, char *uploadCommand);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
@@ -86,16 +62,51 @@ void printHighlightedOption(char *optionName, int width);
 // the available space respectively
 void printOption(char *optionName, int width);
 
+// fills specified width and height with spaces
+void clean (int width, int height);
+
+// getWidths get gets three different widths for menu layout, depending on how
+// much space is currently available in the terminal
+int *getWidths(int sepLength);
+
+void printSpaces(int count);
+
+// getMax gets max value from array
+int getMax(int *array, int size);
+
+// input.c
+
+typedef enum KeyDef {
+    KD_RIGHT,
+    KD_DOWN,
+    KD_LEFT,
+    KD_UP,
+    KD_DOWNLOAD,
+    KD_QUIT,
+} KeyDef;
+
 // getKeyDef returns KeyDef equivalent of a pressed key, so that vi keys are also supported.
 // KEY_* macros are from rlutil.h lib and are not working for me, but I left them just in case.
 // TODO: figure out if KEY_* macros do something on other systems
 KeyDef getKeyDef(int key);
 
+// action.c
+
+typedef enum Action {
+    ACTION_INVALID = -1,
+    ACTION_GO_RIGHT,
+    ACTION_GO_DOWN,
+    ACTION_GO_LEFT,
+    ACTION_GO_UP,
+    ACTION_DOWNLOAD,
+    ACTION_QUIT,
+} Action;
+
 Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight);
 
 int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
 
-void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets);
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets, char *uploadCommand);
 
 // following functions change some values, to navigate the menu
 void goRight(int *depth);
@@ -110,20 +121,45 @@ MDFile getMDFile(MDArray courses, int *highlightedOptions);
 
 void downloadFile(MDFile mdFile, MDClient *client);
 
-// fills specified width and height with spaces
-void clean (int width, int height);
+// msg.c
 
-void printSpaces(int count);
+#define DOWNLOAD_STARTED_MSG_COLOR BLUE
+#define DOWNLOAD_FINISHED_MSG_COLOR GREEN
+#define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
 
-// getWidths get gets three different widths for menu layout, depending on how
-// much space is currently available in the terminal
-int *getWidths(int sepLength);
+// notifyBig prints box with msg in the middle of the screen, waits for keypress,
+// then disappears. Box borders are printed in the color that is passed.
+void msgBig(cchar *msg, int color);
 
-// getMax gets max value from array
-int getMax(int *array, int size);
+// notifySmall prints msg in bottom left corner. msg text is printed in the color
+// that is passed.
+void msgSmall(cchar *msg, int color);
 
-// fread_line reads single line up to n bytes from file with \n removed. s should be at
-// least n + 1 in length. 1 is returned if the line is too long and was cut off.
-int fread_line(FILE *file, char *s, int n);
+// printErr prints msg in red background, waits for key press, then disappears
+void msgErr(cchar *msg);
 
-#endif
+// config.c
+
+#define CFG_ERR_MSG_SIZE 2048
+
+typedef enum Error {
+    CFG_ERR_NONE = 0,
+    CFG_ERR_GET_ENV,
+    CFG_ERR_OPEN_FILE,
+    CFG_ERR_EMPTY_PROPERTY,
+    CFG_ERR_NO_VALUE,
+    CFG_ERR_WRONG_PROPERTY,
+    CFG_ERR_NO_TOKEN,
+    CFG_ERR_ALLOCATE,
+} Error;
+
+typedef struct ConfigValues {
+    char *token;
+    char *uploadCommand;
+} ConfigValues;
+
+cchar *app_error_get_message(Error code);
+
+void readConfigFile(ConfigValues *configValues, Error *error);
+
+#endif // __APP_H

@@ -1,23 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ui.h"
+#include <curl/curl.h>
+
 #include "rlutil.h"
 #include "utf8.h"
 #include "wcwidth.h"
-#include <curl/curl.h>
-#include "moodle.h"
+#include "app.h"
 #include "config.h"
-#include "msg.h"
 
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
 
     ConfigValues configValues;
-    CFGError cfgError;
-    readConfigFile(&configValues, &cfgError);
-    if (cfgError) {
-        msgErr(cfg_error_get_message(cfgError));
+    Error error;
+    readConfigFile(&configValues, &error);
+    if (error) {
+        msgErr(app_error_get_message(error));
         return 0;
     }
     MDError mdError;
@@ -40,7 +39,7 @@ int main() {
 
     hidecursor();
     cls();
-    mainLoop(courseArr, client);
+    mainLoop(courseArr, client, configValues.uploadCommand);
     cls();
     showcursor();
 
@@ -49,7 +48,7 @@ int main() {
     curl_global_cleanup();
 }
 
-void mainLoop (MDArray courses, MDClient *client) {
+void mainLoop (MDArray courses, MDClient *client, char *uploadCommand) {
     Action action;
     int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
     int prevHeight = 0;
@@ -71,7 +70,7 @@ void mainLoop (MDArray courses, MDClient *client) {
             action = getAction(courses, keyDef, depth, menuSize.depth, depthHeight);
         } while (action == ACTION_INVALID);
 
-        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets);
+        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand);
     }
 }
 
@@ -268,201 +267,6 @@ int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
             height = -1;
     }
     return height;
-}
-
-KeyDef getKeyDef(int key) {
-    KeyDef keyDef;
-    switch (key) {
-        case 108: // l
-        case KEY_RIGHT:
-        case 10: // enter
-            keyDef = KD_RIGHT;
-            break;
-        case 106: // j
-        case KEY_DOWN:
-            keyDef = KD_DOWN;
-            break;
-        case 104: // h
-        case KEY_LEFT:
-            keyDef = KD_LEFT;
-            break;
-        case 107: // k
-        case KEY_UP:
-            keyDef = KD_UP;
-            break;
-        case 0:
-            if (getkey() == 91) {
-                key = getkey();
-                switch (key) {
-                    case 67: // arrow key right
-                        keyDef = KD_RIGHT;
-                        break;
-                    case 66: // arrow key down
-                        keyDef = KD_DOWN;
-                        break;
-                    case 65: // arrow key up
-                        keyDef = KD_UP;
-                        break;
-                    case 68: // arrow key left
-                        keyDef = KD_LEFT;
-                }
-            }
-            break;
-        case 113: // q
-            keyDef = KD_QUIT;
-            break;
-        case 115: // s
-            keyDef = KD_DOWNLOAD;
-    }
-    return keyDef;
-}
-
-Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight) {
-    Action action;
-    switch (keyDef) {
-        case KD_RIGHT:
-            if (depth < currentMaxDepth)
-                action = ACTION_GO_RIGHT;
-            else
-                action = ACTION_INVALID;
-            break;
-        case KD_DOWN:
-            if (depthHeight == 1)
-                action = ACTION_INVALID;
-            else 
-                action = ACTION_GO_DOWN;
-            break;
-        case KD_LEFT:
-            if (depth != 0)
-                action = ACTION_GO_LEFT;
-            else
-                action = ACTION_INVALID;
-            break;
-        case KD_UP:
-            if (depthHeight == 1)
-                action = ACTION_INVALID;
-            else
-                action = ACTION_GO_UP;
-            break;
-        case KD_DOWNLOAD:
-            action = ACTION_DOWNLOAD;
-            break;
-        case KD_QUIT:
-            action = ACTION_QUIT;
-            break;
-    }
-    return action;
-};
-
-void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets) {
-    int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
-    MDFile mdFile;
-    int maxHeight = trows() - 2;
-    switch (action) {
-        case ACTION_GO_RIGHT:
-            goRight(depth);
-            break;
-        case ACTION_GO_DOWN:
-            goDown(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
-            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
-            break;
-        case ACTION_GO_LEFT:
-            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
-            goLeft(depth, highlightedOptions);
-            break;
-        case ACTION_GO_UP:
-            goUp(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
-            resetNextDepth(highlightedOptions, *depth, scrollOffsets);
-            break;
-        case ACTION_DOWNLOAD:
-            mdFile = getMDFile(courses, highlightedOptions);
-            downloadFile(mdFile, client);
-            break;
-        default:
-            break;
-    }
-}
-
-void goRight(int *depth) {
-    ++*depth;
-}
-
-void goDown(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
-    if (*highlightedOption + *scrollOffset == depthHeight) {
-        *highlightedOption = 0;
-        *scrollOffset = 0;
-    }
-    else {
-        if (*highlightedOption >= maxHeight - SCROLLOFF && depthHeight - *scrollOffset > maxHeight)
-            ++*scrollOffset;
-        else
-            ++*highlightedOption;
-    }
-}
-
-void goLeft(int *depth, int *highlightedOptions) {
-    --*depth;
-}
-
-void goUp(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
-    if (*highlightedOption + *scrollOffset == 0) {
-        if (depthHeight > maxHeight) {
-            *scrollOffset = depthHeight - maxHeight;
-            *highlightedOption = maxHeight;
-        }
-        else
-            *highlightedOption = depthHeight;
-    }
-    else {
-        if (*scrollOffset != 0 && *highlightedOption <= SCROLLOFF)
-            --*scrollOffset;
-        else
-            --*highlightedOption;
-    }
-}
-
-void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets) {
-    if (depth < LAST_DEPTH - 1) {
-        highlightedOptions[depth + 1] = 0;
-        scrollOffsets[depth + 1] = 0;
-    }
-}
-
-MDFile getMDFile(MDArray courses, int *highlightedOptions) {
-    MDArray topics = MD_COURSES(courses)[highlightedOptions[0]].topics;
-    MDArray modules = MD_TOPICS(topics)[highlightedOptions[1]].modules;
-    MDFile mdFile;
-    if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[2]].type == MD_MOD_RESOURCE) {
-        MDModResource resource;
-        resource = MD_MODULES(modules)[highlightedOptions[2]].contents.resource;
-        mdFile = MD_FILES(resource.files)[highlightedOptions[4]];
-    }
-    else
-        msgSmall("Couldn't get file", RED);
-
-    return mdFile;
-}
-
-void downloadFile(MDFile mdFile, MDClient *client) {
-    FILE* file = fopen(mdFile.filename, "w");
-    char msg[1000];
-    if (!file) {
-        sprintf(msg, "Couldn't open %s for writing", mdFile.filename);
-        msgErr(msg);
-    }
-    MDError err;
-    sprintf(msg, "Downloading: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    msgSmall(msg, BLUE);
-    md_client_download_file(client, &mdFile, file, &err);
-    sprintf(msg, "Downloaded: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    msgSmall(msg, GREEN);
-    fclose(file);
-
-    if (err) {
-        char msg[100];
-        sprintf(msg, "%s", md_error_get_message(err));
-        msgErr(msg);
-    }
 }
 
 int *getWidths(int sepLength) {

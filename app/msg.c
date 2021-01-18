@@ -1,9 +1,7 @@
 #include <stdio.h>
 
-#include "msg.h"
+#include "app.h"
 #include "rlutil.h"
-
-static void printSpaces(int count);
 
 void msgBig(cchar *msg, int color) {
     int msgLen = strlen(msg);
@@ -32,7 +30,7 @@ void msgBig(cchar *msg, int color) {
     printf("┘ ");
 
     resetColor();
-    getch();
+    getkey();
 }
 
 void msgSmall(cchar *msg, int color) {
@@ -52,8 +50,4 @@ void msgErr(cchar *msg) {
     printf("Error: %s",  msg);
     resetColor();
     getch();
-}
-
-void printSpaces(int count) {
-    printf("%*s", count, "");
 }
