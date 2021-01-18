@@ -17,9 +17,6 @@
     printf(_Generic(var, int : "%d", char * : "%s", const char * : "%s", time_t: "%ld", default : "?"), var); \
     printf("\n");
 
-// Macro for zero initializer of a MDArray
-#define MD_ARRAY_INITIALIZER {.len = 0, ._data = NULL}
-
 typedef const char cchar;
 
 // This macros sets faulted error flag if the error is not NONE. It's used to
@@ -42,8 +39,6 @@ void md_error_set_message(cchar *message);
 void md_set_error_handling_warning();
 
 // util.c
-
-void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error);
 
 // struct to temporarily hold data while performing http request.
 typedef struct Memblock {

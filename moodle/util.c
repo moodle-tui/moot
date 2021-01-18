@@ -11,8 +11,15 @@
 void md_array_append(MDArray *array, const void *elem, size_t size, MDError *error) {
     ++array->len;
     array->_data = md_realloc(array->_data, array->len * size, error);
-    if (!*error) {
-        memcpy((void*)((char *)array->_data + (array->len - 1) * size), elem, size);
+    if (array->_data) {
+        memcpy((char *)array->_data + (array->len - 1) * size, elem, size);
+    }
+}
+
+void md_array_free(MDArray *array) {
+    if (array) {
+        free(array->_data);
+        array->len = 0;
     }
 }
 
