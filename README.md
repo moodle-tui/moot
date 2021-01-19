@@ -41,7 +41,7 @@ personal token:
    `<first_part>:::<second_part>`, with the `<second_part>` being the token you
    actually need.
    
-Token have to be specified in config file. See [Configuration](https://github.com/moodle-tui/moot#configuration)
+Token should to be specified in config file. See [Configuration](https://github.com/moodle-tui/moot#configuration)
 
 ### Interface
 To use the app simply run the executable. 
@@ -75,6 +75,7 @@ in the `config.mk` file.
 
 ### Configuration
 App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
+Format: <property> = <value>
 Currently supported values:
 - `token` (required).
     Should be equal to your personal moodle token.
