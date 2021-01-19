@@ -75,8 +75,10 @@ in the `config.mk` file.
 
 ### Configuration
 App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
-Format: <property> = <value>
-Currently supported values:
+
+Format: `<property> = <value>`
+
+Currently supported properties:
 - `token` (required).
     Should be equal to your personal moodle token.
 - `upload_command`.
