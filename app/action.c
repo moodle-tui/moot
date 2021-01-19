@@ -1,10 +1,12 @@
+#define _XOPEN_SOURCE
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <stdbool.h>
 #include "rlutil.h"
 #include "app.h"
 #include "moodle.h"
-
-#define println(format, ...) printf(format "\n", ##__VA_ARGS__)
 
 Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight) {
     Action action;
@@ -36,6 +38,9 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth,
         case KD_DOWNLOAD:
             action = ACTION_DOWNLOAD;
             break;
+        case ACTION_UPLOAD:
+            action = ACTION_UPLOAD;
+            break;
         case KD_QUIT:
             action = ACTION_QUIT;
             break;
@@ -43,8 +48,11 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth,
     return action;
 }
 
-void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets, char *uploadCommand) {
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
+        int *depth, int *scrollOffsets, char *uploadCommand, Error *error, MDError *mdError) {
     int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
     MDFile mdFile;
     int maxHeight = trows() - 2;
     switch (action) {
@@ -66,6 +74,9 @@ void doAction(Action action, MDArray courses, MDClient *client, int *highlighted
         case ACTION_DOWNLOAD:
             mdFile = getMDFile(courses, highlightedOptions);
             downloadFile(mdFile, client);
+            break;
+        case ACTION_UPLOAD:
+            uploadFiles(client, MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]], uploadCommand, error, mdError);
             break;
         default:
             break;
@@ -153,3 +164,68 @@ void downloadFile(MDFile mdFile, MDClient *client) {
         msgErr(msg);
     }
 }
+
+void uploadFiles(MDClient *client, MDModule module, char *uploadCommand, Error *error, MDError *mdError) {
+    if (!uploadCommand) {
+        uploadCommand = UPLOAD_COMMAND;
+    }
+    FILE *uploadPathsPipe = openFileSelectionProcess(uploadCommand, error);
+    if (*error)
+        return;
+    MDArray fileNames = MD_ARRAY_INITIALIZER;
+    for (int i = 0;; ++i) {
+        char *fileName = xmalloc(sizeof(char) * UPLOAD_FILE_LENGTH, error);
+        if (*error)
+            return;
+        if (!fgets(fileName, UPLOAD_FILE_LENGTH, uploadPathsPipe))
+            break;
+
+        removeNewline(fileName);
+        MDError mdError = MD_ERR_NONE;
+        md_array_append(&fileNames, &fileName, sizeof(char *), &mdError);
+    }
+    pclose(uploadPathsPipe);
+    hidecursor();
+    if (fileNames.len == 0) {
+        msgSmall("No files chosen", RED);
+        return;
+    }
+    if (!*mdError && !*error)
+        startUpload(client, module, fileNames, mdError);
+    if (!*mdError)
+        msgSmall(UPLOAD_SUCCESFUL_MSG, UPLOAD_SUCCESFUL_MSG_COLOR);
+    md_array_free(&fileNames);
+}
+
+FILE *openFileSelectionProcess(char *uploadCommand, Error *error) {
+    errno = 0;
+    FILE *uploadPathsPipe = popen(uploadCommand, "r");
+    if (errno) {
+        app_error_set_message(strerror(errno));
+        *error = UPLOAD_ERR_EXEC;
+    }
+    return uploadPathsPipe;
+}
+
+void removeNewline(char *string) {
+    int fileNameLen = strlen(string);
+    if (string[fileNameLen - 1] == '\n')
+        string[fileNameLen - 1] = 0;
+}
+
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, MDError *mdError) {
+    if (module.type == MD_MOD_ASSIGNMENT) {
+        md_client_mod_assign_submit(client, &module, &fileNames, NULL, mdError);
+    }
+    else if (module.type == MD_MOD_WORKSHOP) {
+        msgSmall("Workshop upload is not supported yet", RED);
+        //md_client_mod_workshop_submit(client, &module, &MD_MAKE_ARR(cchar *, filePath), NULL, "hmmm", &error);
+    }
+    else {
+        msgSmall("This is not a workshop or assignment", RED);
+    }
+    if (*mdError)
+        msgErr(md_error_get_message(*mdError));
+}
+
+

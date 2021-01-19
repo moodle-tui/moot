@@ -42,6 +42,9 @@ KeyDef getKeyDef(int key) {
         case 113: // q
             keyDef = KD_QUIT;
             break;
+        case 117: // u
+            keyDef = KD_UPLOAD;
+            break;
         case 115: // s
             keyDef = KD_DOWNLOAD;
             break;

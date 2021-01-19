@@ -5,6 +5,28 @@
 
 typedef const char cchar;
 
+// error.c
+
+#define ERR_MSG_SIZE 2048
+
+typedef enum Error {
+    ERR_NONE = 0,
+    ERR_ALLOCATE,
+    CFG_ERR_GET_ENV,
+    CFG_ERR_OPEN_FILE,
+    CFG_ERR_EMPTY_PROPERTY,
+    CFG_ERR_NO_VALUE,
+    CFG_ERR_WRONG_PROPERTY,
+    CFG_ERR_NO_TOKEN,
+    UPLOAD_ERR_EXEC,
+    UPLOAD_ERR_NO_FILES_CHOSEN,
+    UPLOAD_ERR_WRONG_MODULE,
+} Error;
+
+void app_error_set_message(cchar *message);
+
+cchar *app_error_get_message(Error code);
+
 // ui.c
 
 #define EMPTY_OPTION_NAME "[empty]"
@@ -33,7 +55,7 @@ typedef struct Layout {
 } Layout;
 
 // mainLoop prints all the information and reacts to user input, until user decides to quit
-void mainLoop (MDArray courses, MDClient *client, char *uploadCommand);
+void mainLoop (MDArray courses, MDClient *client, char *uploadCommand, Error *error, MDError *mdError);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
@@ -74,6 +96,10 @@ void printSpaces(int count);
 // getMax gets max value from array
 int getMax(int *array, int size);
 
+// utils.c
+
+void *xmalloc(size_t size, Error *error);
+
 // input.c
 
 typedef enum KeyDef {
@@ -82,6 +108,7 @@ typedef enum KeyDef {
     KD_LEFT,
     KD_UP,
     KD_DOWNLOAD,
+    KD_UPLOAD,
     KD_QUIT,
 } KeyDef;
 
@@ -92,6 +119,11 @@ KeyDef getKeyDef(int key);
 
 // action.c
 
+#define UPLOAD_COMMAND "tempFile=`mktemp` && lf -selection-path $tempFile && cat $tempFile && rm $tempFile"
+#define UPLOAD_FILE_LENGTH 2048
+#define UPLOAD_SUCCESFUL_MSG "Upload succesful"
+#define UPLOAD_SUCCESFUL_MSG_COLOR GREEN
+
 typedef enum Action {
     ACTION_INVALID = -1,
     ACTION_GO_RIGHT,
@@ -99,6 +131,7 @@ typedef enum Action {
     ACTION_GO_LEFT,
     ACTION_GO_UP,
     ACTION_DOWNLOAD,
+    ACTION_UPLOAD,
     ACTION_QUIT,
 } Action;
 
@@ -106,7 +139,8 @@ Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth,
 
 int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
 
-void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions, int *depth, int *scrollOffsets, char *uploadCommand);
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
+        int *depth, int *scrollOffsets, char *uploadCommand, Error *error, MDError *mdError);
 
 // following functions change some values, to navigate the menu
 void goRight(int *depth);
@@ -121,11 +155,17 @@ MDFile getMDFile(MDArray courses, int *highlightedOptions);
 
 void downloadFile(MDFile mdFile, MDClient *client);
 
+void uploadFiles(MDClient *client, MDModule module, char *uploadCommand, Error *error, MDError *mdError);
+FILE *openFileSelectionProcess(char *uploadCommand, Error *error);
+void removeNewline(char *string);
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, MDError *mdError);
+
 // msg.c
 
 #define DOWNLOAD_STARTED_MSG_COLOR BLUE
 #define DOWNLOAD_FINISHED_MSG_COLOR GREEN
 #define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
+#define ERROR_MSG_INIT_STRING "Error: "
 
 // notifyBig prints box with msg in the middle of the screen, waits for keypress,
 // then disappears. Box borders are printed in the color that is passed.
@@ -135,31 +175,22 @@ void msgBig(cchar *msg, int color);
 // that is passed.
 void msgSmall(cchar *msg, int color);
 
-// printErr prints msg in red background, waits for key press, then disappears
+// msgErr prints msg in red background, waits for key press, then disappears
 void msgErr(cchar *msg);
 
 // config.c
-
-#define CFG_ERR_MSG_SIZE 2048
-
-typedef enum Error {
-    CFG_ERR_NONE = 0,
-    CFG_ERR_GET_ENV,
-    CFG_ERR_OPEN_FILE,
-    CFG_ERR_EMPTY_PROPERTY,
-    CFG_ERR_NO_VALUE,
-    CFG_ERR_WRONG_PROPERTY,
-    CFG_ERR_NO_TOKEN,
-    CFG_ERR_ALLOCATE,
-} Error;
 
 typedef struct ConfigValues {
     char *token;
     char *uploadCommand;
 } ConfigValues;
 
-cchar *app_error_get_message(Error code);
-
 void readConfigFile(ConfigValues *configValues, Error *error);
+
+// main.c
+
+void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, Error *error, MDError *mdError);
+void terminate(MDClient *client, MDArray courses);
+void printErrIfErr(Error error, MDError mdError);
 
 #endif // __APP_H

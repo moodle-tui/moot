@@ -28,9 +28,15 @@ void msgBig(cchar *msg, int color) {
     for (int i = 0; i < msgLen + 2; ++i)
         printf("─");
     printf("┘ ");
-
     resetColor();
-    getkey();
+    getch();
+
+    locate(x, y);
+    printSpaces(msgLen + 5);
+    locate(x, --y);
+    printSpaces(msgLen + 5);
+    locate(x, --y);
+    printSpaces(msgLen + 5);
 }
 
 void msgSmall(cchar *msg, int color) {
@@ -47,7 +53,7 @@ void msgErr(cchar *msg) {
     showcursor();
     saveDefaultColor();
     setColor(RED);
-    printf("Error: %s",  msg);
+    printf("%s%s", ERROR_MSG_INIT_STRING, msg);
     resetColor();
     getch();
 }

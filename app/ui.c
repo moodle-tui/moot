@@ -1,60 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <curl/curl.h>
 
 #include "rlutil.h"
 #include "utf8.h"
 #include "wcwidth.h"
 #include "app.h"
-#include "config.h"
 
-int main() {
-    curl_global_init(CURL_GLOBAL_ALL);
-
-    ConfigValues configValues;
-    Error error;
-    readConfigFile(&configValues, &error);
-    if (error) {
-        msgErr(app_error_get_message(error));
-        return 0;
-    }
-    MDError mdError;
-    MDClient *client = md_client_new(configValues.token, "https://emokymai.vu.lt", &mdError);
-    if (mdError) {
-        msgErr(md_error_get_message(mdError));
-        return 0;
-    }
-
-    md_client_init(client, &mdError);
-    if (mdError) {
-        msgErr(md_error_get_message(mdError));
-        return 0;
-    }
-    MDArray courseArr = md_client_fetch_courses(client, &mdError);
-    if (mdError) {
-        msgErr(md_error_get_message(mdError));
-        return 0;
-    }
-
-    hidecursor();
-    cls();
-    mainLoop(courseArr, client, configValues.uploadCommand);
-    cls();
-    showcursor();
-
-    md_courses_cleanup(courseArr);
-    md_client_cleanup(client);
-    curl_global_cleanup();
-}
-
-void mainLoop (MDArray courses, MDClient *client, char *uploadCommand) {
+void mainLoop (MDArray courses, MDClient *client, char *uploadCommand, Error *error, MDError *mdError) {
     Action action;
     int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
     int prevHeight = 0;
     int scrollOffsets[LAST_DEPTH] = {0};
 
-    while (action != ACTION_QUIT) {
+    while (action != ACTION_QUIT && !*error && !*mdError) {
         OptionCoordinates menuSize;
         locate(0, 0);
         menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
@@ -69,8 +28,7 @@ void mainLoop (MDArray courses, MDClient *client, char *uploadCommand) {
             KeyDef keyDef = getKeyDef(key);
             action = getAction(courses, keyDef, depth, menuSize.depth, depthHeight);
         } while (action == ACTION_INVALID);
-
-        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand);
+        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand, error, mdError);
     }
 }
 

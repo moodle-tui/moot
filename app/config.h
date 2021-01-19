@@ -21,6 +21,7 @@
 
 static cchar * const properties[] = {
     "token",
+    "upload_command",
 };
 
 typedef enum Property {
@@ -35,16 +36,12 @@ char *getSysConfigHome();
 FILE *openConfigFile(char *configPath, Error *error);
 char *joinPaths(char *string1, char *string2);
 void processLine(char *line, ConfigValues *configValues, Error *error);
-void xmalloc(void **var, size_t size, Error *error);
 char *sreadProperty(char *line, int *readPos, Error *error);
 Property getProperty(char *propertyStr, Error *error);
 void skipSeperator(int *readPos);
 void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Error *error);
 char *sreadToken(char *line, int *readPos, Error *error);
 char *sreadUntil(char *line, char mark, int limit, int *readPos);
-
-// cfgError.c
-void app_error_set_message(cchar *message);
 
 #endif // __CFG_LOCAL_H
 

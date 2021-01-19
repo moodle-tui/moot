@@ -7,7 +7,7 @@
 #include "config.h"
 
 void readConfigFile(ConfigValues *configValues, Error *error) {
-    *error = CFG_ERR_NONE;
+    *error = ERR_NONE;
 
     char *configPath = getConfigPath(error);
     if (*error)
@@ -17,8 +17,7 @@ void readConfigFile(ConfigValues *configValues, Error *error) {
     if (*error)
         return;
 
-    char *line;
-    xmalloc((void **) &line, LINE_LIMIT * sizeof(char), error);
+    char *line = xmalloc(LINE_LIMIT * sizeof(char), error);
     if (!*error) {
         while (fgets(line, LINE_LIMIT, configFile)) {
             if (line[0] != '\n')
@@ -69,12 +68,6 @@ void processLine(char *line, ConfigValues *configValues, Error *error) {
 
     skipSeperator(&readPos);
     sreadValue(configValues, property, line, &readPos, error);
-}
-
-void xmalloc(void **var, size_t size, Error *error) {
-    *var = malloc(size);
-    if (!*var)
-        *error = CFG_ERR_ALLOCATE;
 }
 
 char *sreadProperty(char *line, int *readPos, Error *error) {

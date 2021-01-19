@@ -641,7 +641,7 @@ RLUTIL_INLINE void msleep(unsigned int ms) {
 #else
 	// usleep argument must be under 1 000 000
 	if (ms > 1000) sleep(ms/1000000);
-	msleep((ms % 1000000) * 1000);
+	sleep((ms % 1000000) * 1000);
 #endif
 }
 
