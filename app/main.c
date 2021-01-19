@@ -46,7 +46,7 @@ void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues,
     if (*mdError)
         return;
 
-    *courses = md_client_fetch_courses(*client, mdError);
+    *courses = md_client_fetch_courses(*client, 0, mdError);
 }
 
 void printErrIfErr(Error error, MDError mdError) {

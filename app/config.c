@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "config.h"
 
@@ -71,7 +72,7 @@ void processLine(char *line, ConfigValues *configValues, Error *error) {
 }
 
 char *sreadProperty(char *line, int *readPos, Error *error) {
-    char *propertyStr = sreadUntil(line, CFG_SEPERATOR, LINE_LIMIT, readPos);
+    char *propertyStr = sreadUntil(line, CFG_SEPERATOR, LINE_LIMIT, readPos, 1);
     ++readPos;
     if (!propertyStr) {
         *error = CFG_ERR_NO_VALUE;
@@ -97,18 +98,18 @@ void skipSeperator(int *readPos) {
 void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Error *error) {
     switch (property) {
         case PROPERTY_TOKEN:
-            configValues->token = sreadUntil(line, '\n', LINE_LIMIT, readPos);
+            configValues->token = sreadUntil(line, '\n', LINE_LIMIT, readPos, 1);
             if (!configValues->token)
                 *error = CFG_ERR_NO_TOKEN;
             break;
         case PROPERTY_UPLOAD_COMMAND:
-            configValues->uploadCommand = sreadUntil(line, '\n', LINE_LIMIT, readPos);
+            configValues->uploadCommand = sreadUntil(line, '\n', LINE_LIMIT, readPos, 0);
         default:
             break;
     }
 }
 
-char *sreadUntil(char *line, char mark, int limit, int *readPos) {
+char *sreadUntil(char *line, char mark, int limit, int *readPos, bool ignoreBlank) {
     char *str = malloc(sizeof(char) * limit);
     int len = -1;
     for (; line[*readPos]; ++*readPos) {
@@ -116,7 +117,7 @@ char *sreadUntil(char *line, char mark, int limit, int *readPos) {
             str[++len] = 0;
             return str;
         }
-        if (!isblank(line[*readPos]))
+        if (((ignoreBlank && !isblank(line[*readPos])) || !ignoreBlank) && line[*readPos])
             str[++len] = line[*readPos];
     }
     return NULL;

@@ -41,7 +41,7 @@ Property getProperty(char *propertyStr, Error *error);
 void skipSeperator(int *readPos);
 void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Error *error);
 char *sreadToken(char *line, int *readPos, Error *error);
-char *sreadUntil(char *line, char mark, int limit, int *readPos);
+char *sreadUntil(char *line, char mark, int limit, int *readPos, bool ignoreBlank);
 
 #endif // __CFG_LOCAL_H
 

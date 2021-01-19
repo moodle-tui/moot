@@ -46,11 +46,12 @@ To use the app put token in `.token` file in executable directory, and run the e
 You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
 where the middle column is the current column you are navigating in.
 
-### Keybindings and actions
-These are keybindings and actions, that moot interface currently supports. More comming soon.
+### Commands
+These are commands, that moot interface currently supports. More comming soon.
 - To move around, us the arrow keys or vim equivalents (`h`, `j`, `k`, `l`).
 - To quit, press `q`.
-- To download a file, hover it and press `s`. You will get a succes message in bottom left, when download is completed.
+- To download a file, hover it and press `s`.
+- To upload files, hover desired module and press `u`. (Only assignments currently supported)
 
 ## Installing
 Currently we don't provide any prebuilt binaries, so one has to build for himself and put the final executable in [path](https://en.wikipedia.org/wiki/PATH_(variable))
@@ -64,10 +65,18 @@ While it has only been built and tested on linux, it is coded with portability a
  - GNU make
  - C compiler (at least C11)
  - [libcurl](https://curl.se/libcurl/)
+ - [lf](https://github.com/gokcehan/lf) (for files selection. Optional)
 
 #### Configuring
 Compiling (compiler, target executable, etc) can be configured for your system
-in the `config.mk` file. 
+in the `config.mk` file.
+
+Configuration file should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
+Currently supported values:
+- token (required).
+    Should be equal to your personal moodle token.
+- upload_command.
+    Should return newline seperated file paths to stdout.
 
 #### Building
 
