@@ -40,9 +40,11 @@ personal token:
    <token_base64> part. The output will look like this:
    `<first_part>:::<second_part>`, with the `<second_part>` being the token you
    actually need.
+   
+Token have to be specified in config file. See [Configuration](https://github.com/moodle-tui/moot#configuration)
 
 ### Interface
-To use the app put token in `.token` file in executable directory, and run the executable. 
+To use the app simply run the executable. 
 You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
 where the middle column is the current column you are navigating in.
 
@@ -71,11 +73,12 @@ While it has only been built and tested on linux, it is coded with portability a
 Compiling (compiler, target executable, etc) can be configured for your system
 in the `config.mk` file.
 
-Configuration file should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
+### Configuration
+App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
 Currently supported values:
-- token (required).
+- `token` (required).
     Should be equal to your personal moodle token.
-- upload_command.
+- `upload_command`.
     Should return newline seperated file paths to stdout.
 
 #### Building
