@@ -5,6 +5,7 @@
 .ccls-cache
 moodle/test/test
 lib/tests/json
+app/html_renderer
 moot
 
 # compiled plugins

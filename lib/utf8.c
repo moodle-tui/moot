@@ -94,6 +94,28 @@ size_t utf8decode(const char* c, Rune* u, size_t clen) {
     return len;
 }
 
+size_t utf8decodeNullTerm(const char* c, Rune* u) {
+    size_t i, j, len, type;
+    Rune udecoded;
+
+    *u = UTF_INVALID;
+    if (!*c)
+        return 0;
+    udecoded = utf8decodebyte(c[0], &len);
+    if (!BETWEEN(len, 1, UTF_SIZ))
+        return 1;
+    for (i = 1, j = 1; c[i] && j < len; ++i, ++j) {
+        udecoded = (udecoded << 6) | utf8decodebyte(c[i], &type);
+        if (type != 0)
+            return j;
+    }
+    if (j < len)
+        return 0;
+    *u = udecoded;
+    utf8validate(u, len);
+    return len;
+}
+
 Rune utf8decodebyte(char c, size_t* i) {
     for (*i = 0; *i < LEN(utfmask); ++(*i))
         if (((uchar)c & utfmask[*i]) == utfbyte[*i])

@@ -20,6 +20,7 @@ typedef struct WrappedLines {
 
 HtmlRender renderHtml(const char *html);
 WrappedLines wrapHtmlRender(HtmlRender render, uint width);
+WrappedLines wordWrapHtmlRender(HtmlRender render, uint width);
 void freeHtmlRender(HtmlRender render);
 void freeWrappedLines(WrappedLines lines);
 

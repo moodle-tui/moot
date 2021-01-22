@@ -190,7 +190,7 @@ WrappedLines wrapHtmlRender(HtmlRender render, uint width) {
                 result.lines = reallocOk(result.lines, capacity * sizeof(Line), &ok);
             }
             if (result.lines) {
-                result.lines[result.count].text = begin; 
+                result.lines[result.count].text = begin;
                 result.lines[result.count].length = end - begin;
                 ++result.count;
             } else {
@@ -198,6 +198,63 @@ WrappedLines wrapHtmlRender(HtmlRender render, uint width) {
             }
             begin = end;
         } while (*begin && ok);
+    }
+    result.lines = realloc(result.lines, result.count * sizeof(Line));
+    return result;
+}
+
+const char *const BREAK_CHARS = " -()/";
+
+WrappedLines wordWrapHtmlRender(HtmlRender render, uint width) {
+    // Assuming that only whitespace are spaces and not consecutive.
+    WrappedLines result = {.count = 0, .lines = NULL};
+    if (width < 2) {
+        return result;
+    }
+    size_t capacity = 0;
+    bool ok = true;
+    for (int i = 0; i < render.lineCount && ok; ++i) {
+        const char *it = render.lines[i], *lastBreakPos;
+        do {
+            // Skip leading space.
+            if (*it == ' ') {
+                ++it;
+            }
+            const char *begin = it, *lastOne = NULL;
+            lastBreakPos = NULL;
+            uint sliceWidth = 0;
+            while (sliceWidth < width && *it) {
+                if (strchr(BREAK_CHARS, *it)) {
+                    lastBreakPos = it;
+                }
+                lastOne = it;
+                Rune ch;
+                size_t chLength = utf8decodeNullTerm(it, &ch);
+                it += chLength;
+                // FIXME - may return negative number.
+                sliceWidth += wcwidth(ch);
+            }
+            const char *end = it;
+            if (sliceWidth >= width && !strchr(BREAK_CHARS, *it) && !strchr(BREAK_CHARS, *lastOne)) {
+                if (lastBreakPos && lastBreakPos - begin > 1) {
+                    end = lastBreakPos + 1;
+                } else {
+                    end = lastOne;
+                }
+            }
+            if (result.count >= capacity) {
+                capacity = capacity ? capacity * 2 : 1;
+                result.lines = reallocOk(result.lines, capacity * sizeof(Line), &ok);
+            }
+            if (result.lines) {
+                result.lines[result.count].text = begin;
+                result.lines[result.count].length = end - begin;
+                ++result.count;
+            } else {
+                result.count = 0;
+            }
+            it = end;
+        } while (*it && ok);
     }
     result.lines = realloc(result.lines, result.count * sizeof(Line));
     return result;
@@ -213,3 +270,17 @@ void freeHtmlRender(HtmlRender render) {
 void freeWrappedLines(WrappedLines lines) {
     free(lines.lines);
 }
+
+// int main() {
+//     char *html;
+//     scanf("%m[^#]", &html);
+//     HtmlRender render = renderHtml(html);
+//     WrappedLines lines = wordWrapHtmlRender(render, 45);
+//     for (int i = 0; i < lines.count; ++i) {
+//         fwrite(lines.lines[i].text, 1, lines.lines[i].length, stdout);
+//         fputc('\n', stdout);
+//     }
+//     freeHtmlRender(render);
+//     freeWrappedLines(lines);
+//     free(html);
+// }
