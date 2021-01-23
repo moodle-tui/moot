@@ -11,8 +11,12 @@
 int main() {
     MDError mdError = MD_ERR_NONE;
     ConfigValues configValues;
-    Message msg;
+    Message msg, prevMsg;
     msgInit(&msg);
+    msgInit(&prevMsg);
+    if (!msg.msg || !prevMsg.msg) {
+        printMsgNoUI((Message) {MSG_CANNOT_ALLOCATE, MSG_TYPE_ERROR});
+    }
     readConfigFile(&configValues, &msg);
     if (msg.msg[0]) {
         printMsgNoUI(msg);
@@ -25,17 +29,17 @@ int main() {
     if (mdError) {
         createMsg(&msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
         printMsgNoUI(msg);
-        terminate(client, courses, &msg);
+        terminate(client, courses, &msg, &prevMsg);
         return 0;
     }
 
     hidecursor();
     cls();
-    mainLoop(courses, client, configValues.uploadCommand);
+    mainLoop(courses, client, configValues.uploadCommand, &msg, &prevMsg);
     cls();
     showcursor();
 
-    terminate(client, courses, &msg);
+    terminate(client, courses, &msg, &prevMsg);
     return 0;
 }
 
@@ -52,8 +56,9 @@ void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues,
     *courses = md_client_fetch_courses(*client, 0, mdError);
 }
 
-void terminate(MDClient *client, MDArray courses, Message *msg) {
+void terminate(MDClient *client, MDArray courses, Message *msg, Message *prevMsg) {
     free(msg->msg);
+    free(prevMsg->msg);
     md_courses_cleanup(courses);
     md_client_cleanup(client);
     md_cleanup();

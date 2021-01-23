@@ -7,33 +7,40 @@
 #include "wcwidth.h"
 #include "app.h"
 
-void mainLoop(MDArray courses, MDClient *client, char *uploadCommand) {
+void mainLoop(MDArray courses, MDClient *client, char *uploadCommand, Message *msg, Message *prevMsg) {
     Action action;
     int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
     int scrollOffsets[LAST_DEPTH] = {0};
-    Message msg, prevMsg;
-    msgInit(&msg);
-    msgInit(&prevMsg);
     OptionCoordinates menuSize;
     menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
 
     while (action != ACTION_QUIT) {
         if (kbhit()) {
+            savePrevMessage(msg, prevMsg);
+            msg->type = MSG_TYPE_NONE;
             int key = getkey();
             action = getAction(key);
             validateAction(&action, courses, highlightedOptions, depth, menuSize.depth);
             if (action != ACTION_INVALID) {
-                doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand, &msg);
+                doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand, msg);
             }
             cls();
-            int nrOfRecurringMessages = getNrOfRecurringMessages(msg, &prevMsg, action);
-            printMsg(msg, nrOfRecurringMessages);
+            if (msg->type == MSG_TYPE_NONE)
+                restorePrevMessage(msg, prevMsg);
+            int nrOfRecurringMessages = getNrOfRecurringMessages(*msg, prevMsg, action);
+            printMsg(*msg, nrOfRecurringMessages);
             locate(0, 0);
             menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
         }
     }
-    free(msg.msg);
-    free(prevMsg.msg);
+}
+
+void savePrevMessage(Message *msg, Message *prevMsg) {
+    createMsg(prevMsg, msg->msg, NULL, msg->type);
+}
+
+void restorePrevMessage(Message *msg, Message *prevMsg) {
+    createMsg(msg, prevMsg->msg, NULL, prevMsg->type);
 }
 
 OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int depth, int *scrollOffsets) {

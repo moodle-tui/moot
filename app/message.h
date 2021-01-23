@@ -32,6 +32,7 @@ typedef const char cchar;
 
 typedef enum MsgType {
     MSG_TYPE_NONE,
+    MSG_TYPE_DISMISSED,
     MSG_TYPE_SUCCESS,
     MSG_TYPE_INFO,
     MSG_TYPE_BAD_ACTION,
@@ -54,9 +55,5 @@ typedef struct Message {
 
 void createMsg(Message *msg, cchar *content, cchar *details, MsgType type);
 void msgInit(Message *msg);
-bool checkIfMsgBad(Message msg);
-void printMsg(Message msg, int nrOfRecurringMessages);
-int msgCompare(Message msg1, Message msg2);
-void printMsgNoUI(Message msg);
 
 #endif // __MESSAGE_H

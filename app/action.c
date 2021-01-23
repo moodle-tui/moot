@@ -121,7 +121,7 @@ void doAction(Action action, MDArray courses, MDClient *client, int *highlighted
             resetNextDepth(highlightedOptions, *depth, scrollOffsets);
             break;
         case ACTION_DISMISS_MSG:
-            msgInit(msg);
+            createMsg(msg, NULL, NULL, MSG_TYPE_DISMISSED);
             break;
         case ACTION_DOWNLOAD:
             mdFile = getMDFile(modules, highlightedOptions, *depth, msg);
@@ -183,7 +183,7 @@ void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets) {
 
 MDFile getMDFile(MDArray modules, int *highlightedOptions, int depth, Message *msg) {
     MDFile mdFile;
-    if (depth < MODULES_DEPTH) {
+    if (depth != MODULE_CONTENTS_DEPTH2) {
         createMsg(msg, MSG_NOT_FILE, NULL, MSG_TYPE_WARNING);
         return mdFile;
     }
@@ -200,21 +200,20 @@ MDFile getMDFile(MDArray modules, int *highlightedOptions, int depth, Message *m
 }
 
 void downloadFile(MDFile mdFile, MDClient *client, Message *msg) {
-    errno = 0;
-    MDError mdError;
     FILE* file = fopen(mdFile.filename, "w");
-    if (errno) {
-        createMsg(msg, MSG_CANNOT_OPEN_DOWNLOAD_FILE, strerror(errno), MSG_TYPE_ERROR);
+    if (!file) {
+        createMsg(msg, MSG_CANNOT_OPEN_DOWNLOAD_FILE, NULL, MSG_TYPE_ERROR);
         return;
     }
+    MDError mdError;
     md_client_download_file(client, &mdFile, file, &mdError);
     fclose(file);
+
     if (mdError) {
         createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
         return;
     }
     createMsg(msg, MSG_DOWNLOADED, mdFile.filename, MSG_TYPE_SUCCESS);
-    free(mdFile.filename);
 }
 
 void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg) {

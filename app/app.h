@@ -7,29 +7,12 @@
 
 typedef const char cchar;
 
-// error.c
+// message.c
 
-#define ERR_MSG_SIZE 2048
-
-typedef enum Error {
-    ERR_NONE = 0,
-    ERR_ALLOCATE,
-    CFG_ERR_GET_ENV,
-    CFG_ERR_OPEN_FILE,
-    CFG_ERR_EMPTY_PROPERTY,
-    CFG_ERR_NO_VALUE,
-    CFG_ERR_WRONG_PROPERTY,
-    CFG_ERR_NO_TOKEN,
-    UPLOAD_ERR_EXEC,
-    UPLOAD_ERR_NO_FILES_CHOSEN,
-    UPLOAD_ERR_WRONG_MODULE,
-} Error;
-
-void setErrorMsg(cchar *message);
-
-cchar *getErrorMsg(Error error);
-cchar *getAnyErrorMsg(Error error, MDError mdError);
-void printErr(cchar *msg);
+bool checkIfMsgBad(Message msg);
+void printMsg(Message msg, int nrOfRecurringMessages);
+int msgCompare(Message msg1, Message msg2);
+void printMsgNoUI(Message msg);
 
 // ui.c
 
@@ -59,7 +42,9 @@ typedef struct Layout {
 } Layout;
 
 // mainLoop prints all the information and reacts to user input, until user decides to quit
-void mainLoop(MDArray courses, MDClient *client, char *uploadCommand);
+void mainLoop(MDArray courses, MDClient *client, char *uploadCommand, Message *msg, Message *prevMsg);
+void savePrevMessage(Message *msg, Message *prevMsg);
+void restorePrevMessage(Message *msg, Message *prevMsg);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
@@ -162,6 +147,6 @@ void readConfigFile(ConfigValues *configValues, Message *msg);
 // main.c
 
 void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, MDError *mdError);
-void terminate(MDClient *client, MDArray courses, Message *msg);
+void terminate(MDClient *client, MDArray courses, Message *msg, Message *prevMsg);
 
 #endif // __APP_H

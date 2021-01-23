@@ -6,15 +6,13 @@
 #include "rlutil.h"
 
 void createMsg(Message *msg, cchar *content, cchar *details, MsgType type) {
-    if (!msg->msg)
-        msgInit(msg);
     snprintf(msg->msg, MSG_LEN, content, details);
     msg->type = type;
 }
 
 void msgInit(Message *msg) {
     *msg = (Message) {
-        .msg = calloc(MSG_LEN, sizeof(char)),
+        .msg = malloc(MSG_LEN * sizeof(char)),
         .type = MSG_TYPE_NONE,
     };
 }
@@ -56,8 +54,6 @@ void printMsg(Message msg, int nrOfRecurringMessages) {
 }
 
 int msgCompare(Message msg1, Message msg2) {
-    if (msg1.type == MSG_TYPE_NONE || msg2.type == MSG_TYPE_NONE)
-        return -1;
     if (msg1.type != msg2.type || strcmp(msg1.msg, msg2.msg))
         return -1;
     return 0;
