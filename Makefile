@@ -35,16 +35,16 @@ $(GUMBO)/%.o: $(GUMBO)/%.c
 $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) -o $@
 
-$(APP)/%.o: $(APP)/%.c $(LIB_OBJ) $(MOODLE_OBJ)
+$(APP)/%.o: $(APP)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
 
 $(LIB): $(LIB_OBJ)
 
 $(MOODLE): $(MOODLE_REQ) $(MOODLE_OBJ)
 
-$(APP): $(LIB) $(APP_OBJ)
+$(APP): $(LIB) $(APP_OBJ) $(GUMBO_OBJ)
 
-moot: $(APP_OBJ) $(MOODLE_OBJ) $(LIB_OBJ)
+moot: $(APP_OBJ) $(MOODLE_OBJ) $(LIB_OBJ) $(GUMBO_OBJ)
 	$(CC) $(CCFLAGS) $^ $(LDLIBS) $(LIBS) -o $(TARGET)
 
 
