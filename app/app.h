@@ -2,8 +2,64 @@
 #define __APP_H
 
 #include "moodle.h"
+#include "rlutil.h"
 
 typedef const char cchar;
+
+// message.c
+
+#define MSG_LEN 4096
+#define ERROR_MSG_INIT_STRING "Error: "
+
+// success messages
+#define MSG_DOWNLOADED "Succesfully downloaded %s"
+#define MSG_UPLOADED "Succesfully uploaded %s files"
+
+// bad action messages
+#define MSG_NO_FILES_CHOSEN "No files chosen"
+#define MSG_NOT_ASSIGNMENT_OR_WORKSHOP "This is not an assignment or a workshop"
+#define MSG_NOT_FILE "This is not a file"
+
+// warning messages
+#define MSG_NO_CFG_VALUE "No value found for: %s"
+#define MSG_WRONG_CFG_PROPERTY "No property named %s"
+
+// error messages
+#define MSG_CANNOT_GET_ENV "Couldn't find required environment variables for your system"
+#define MSG_CANNOT_OPEN_CONFIG_FILE "Couldn't open config file: %s"
+#define MSG_NO_TOKEN "No token found in config file"
+#define MSG_CANNOT_ALLOCATE "Cannot allocate memory"
+#define MSG_CANNOT_OPEN_DOWNLOAD_FILE "Cannot open file for download: %s"
+#define MSG_CANNOT_EXEC_UPLOAD_CMD "Couldn't execute upload command: %s"
+
+typedef enum MsgType {
+    MSG_TYPE_NONE,
+    MSG_TYPE_SUCCESS,
+    MSG_TYPE_INFO,
+    MSG_TYPE_BAD_ACTION,
+    MSG_TYPE_WARNING,
+    MSG_TYPE_ERROR,
+} MsgType;
+
+typedef enum MsgColors {
+    MSG_COLOR_SUCCESS = GREEN,
+    MSG_COLOR_INFO = BLUE,
+    MSG_COLOR_BAD_ACTION = GREY, 
+    MSG_COLOR_WARNING = LIGHTRED,
+    MSG_COLOR_ERROR = RED,
+} MsgColors;
+
+typedef struct Message {
+    char *msg;
+    MsgType type;
+} Message;
+
+void createMsg(Message *msg, cchar *content, cchar *details, MsgType type);
+void msgInit(Message *msg);
+bool checkIfMsgBad(Message msg);
+void printMsg(Message msg, int nrOfRecurringMessages);
+int msgCompare(Message msg1, Message msg2);
+void printMsgNoUI(Message msg);
 
 // error.c
 
@@ -23,9 +79,11 @@ typedef enum Error {
     UPLOAD_ERR_WRONG_MODULE,
 } Error;
 
-void app_error_set_message(cchar *message);
+void setErrorMsg(cchar *message);
 
-cchar *app_error_get_message(Error code);
+cchar *getErrorMsg(Error error);
+cchar *getAnyErrorMsg(Error error, MDError mdError);
+void printErr(cchar *msg);
 
 // ui.c
 
@@ -55,7 +113,7 @@ typedef struct Layout {
 } Layout;
 
 // mainLoop prints all the information and reacts to user input, until user decides to quit
-void mainLoop (MDArray courses, MDClient *client, char *uploadCommand, Error *error, MDError *mdError);
+void mainLoop(MDArray courses, MDClient *client, char *uploadCommand);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
@@ -89,40 +147,17 @@ void clean (int width, int height);
 
 // getWidths get gets three different widths for menu layout, depending on how
 // much space is currently available in the terminal
-int *getWidths(int sepLength);
+int *getWidths();
 
 void printSpaces(int count);
 
 // getMax gets max value from array
 int getMax(int *array, int size);
 
-// utils.c
-
-void *xmalloc(size_t size, Error *error);
-
-// input.c
-
-typedef enum KeyDef {
-    KD_RIGHT,
-    KD_DOWN,
-    KD_LEFT,
-    KD_UP,
-    KD_DOWNLOAD,
-    KD_UPLOAD,
-    KD_QUIT,
-} KeyDef;
-
-// getKeyDef returns KeyDef equivalent of a pressed key, so that vi keys are also supported.
-// KEY_* macros are from rlutil.h lib and are not working for me, but I left them just in case.
-// TODO: figure out if KEY_* macros do something on other systems
-KeyDef getKeyDef(int key);
-
 // action.c
 
 #define UPLOAD_COMMAND "tempFile=`mktemp` && lf -selection-path $tempFile && cat $tempFile && rm $tempFile"
 #define UPLOAD_FILE_LENGTH 2048
-#define UPLOAD_SUCCESFUL_MSG "Upload succesful"
-#define UPLOAD_SUCCESFUL_MSG_COLOR GREEN
 
 typedef enum Action {
     ACTION_INVALID = -1,
@@ -130,17 +165,19 @@ typedef enum Action {
     ACTION_GO_DOWN,
     ACTION_GO_LEFT,
     ACTION_GO_UP,
-    ACTION_DOWNLOAD,
+    ACTION_DISMISS_MSG,
     ACTION_UPLOAD,
+    ACTION_DOWNLOAD,
     ACTION_QUIT,
 } Action;
 
-Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight);
+Action getAction(int key);
+void validateAction(Action *action, MDArray courses, int *highlightedOptions, int depth, int currentMaxDepth);
 
 int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
 
 void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
-        int *depth, int *scrollOffsets, char *uploadCommand, Error *error, MDError *mdError);
+        int *depth, int *scrollOffsets, char *uploadCommand, Message *msg);
 
 // following functions change some values, to navigate the menu
 void goRight(int *depth);
@@ -151,32 +188,21 @@ void goUp(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scro
 void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets);
 
 // getMDFile returns currently highlighted mdFile
-MDFile getMDFile(MDArray courses, int *highlightedOptions);
+MDFile getMDFile(MDArray modules, int *highlightedOptions, int depth, Message *msg);
 
-void downloadFile(MDFile mdFile, MDClient *client);
+void downloadFile(MDFile mdFile, MDClient *client, Message *msg);
 
-void uploadFiles(MDClient *client, MDModule module, char *uploadCommand, Error *error, MDError *mdError);
-FILE *openFileSelectionProcess(char *uploadCommand, Error *error);
+void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg);
+FILE *openFileSelectionProcess(char *uploadCommand, Message *msg);
 void removeNewline(char *string);
-void startUpload(MDClient *client, MDModule module, MDArray fileNames, MDError *mdError);
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *msg);
 
-// msg.c
+// util.c
 
-#define DOWNLOAD_STARTED_MSG_COLOR BLUE
-#define DOWNLOAD_FINISHED_MSG_COLOR GREEN
-#define NO_FILE_TO_DOWNLOAD_MSG_COLOR RED
-#define ERROR_MSG_INIT_STRING "Error: "
-
-// notifyBig prints box with msg in the middle of the screen, waits for keypress,
-// then disappears. Box borders are printed in the color that is passed.
-void msgBig(cchar *msg, int color);
-
-// notifySmall prints msg in bottom left corner. msg text is printed in the color
-// that is passed.
-void msgSmall(cchar *msg, int color);
-
-// msgErr prints msg in red background, waits for key press, then disappears
-void msgErr(cchar *msg);
+char *getStr(int n);
+int getNrOfDigits(int number);
+void *xmalloc(size_t size, Message *msg);
+int getNrOfRecurringMessages(Message msg, Message *prevMsg, Action action);
 
 // config.c
 
@@ -185,12 +211,11 @@ typedef struct ConfigValues {
     char *uploadCommand;
 } ConfigValues;
 
-void readConfigFile(ConfigValues *configValues, Error *error);
+void readConfigFile(ConfigValues *configValues, Message *msg);
 
 // main.c
 
-void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, Error *error, MDError *mdError);
-void terminate(MDClient *client, MDArray courses);
-void printErrIfErr(Error error, MDError mdError);
+void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, MDError *mdError);
+void terminate(MDClient *client, MDArray courses, Message *msg);
 
 #endif // __APP_H

@@ -7,36 +7,40 @@
 #include "wcwidth.h"
 #include "app.h"
 
-void mainLoop (MDArray courses, MDClient *client, char *uploadCommand, Error *error, MDError *mdError) {
+void mainLoop(MDArray courses, MDClient *client, char *uploadCommand) {
     Action action;
     int depth = 0, highlightedOptions[LAST_DEPTH] = {0};
-    int prevHeight = 0;
     int scrollOffsets[LAST_DEPTH] = {0};
+    Message msg, prevMsg;
+    msgInit(&msg);
+    msgInit(&prevMsg);
+    OptionCoordinates menuSize;
+    menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
 
-    while (action != ACTION_QUIT && !*error && !*mdError) {
-        OptionCoordinates menuSize;
-        locate(0, 0);
-        menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
-
-        if (prevHeight > menuSize.height)
-            clean(tcols(), prevHeight - menuSize.height);
-        prevHeight = menuSize.height;
-
-        int depthHeight = getDepthHeight(depth, courses, highlightedOptions);
-        do {
+    while (action != ACTION_QUIT) {
+        if (kbhit()) {
             int key = getkey();
-            KeyDef keyDef = getKeyDef(key);
-            action = getAction(courses, keyDef, depth, menuSize.depth, depthHeight);
-        } while (action == ACTION_INVALID);
-        doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand, error, mdError);
+            action = getAction(key);
+            validateAction(&action, courses, highlightedOptions, depth, menuSize.depth);
+            if (action != ACTION_INVALID) {
+                doAction(action, courses, client, highlightedOptions, &depth, scrollOffsets, uploadCommand, &msg);
+            }
+            cls();
+            int nrOfRecurringMessages = getNrOfRecurringMessages(msg, &prevMsg, action);
+            printMsg(msg, nrOfRecurringMessages);
+            locate(0, 0);
+            menuSize = printMenu(courses, highlightedOptions, depth, scrollOffsets);
+        }
     }
+    free(msg.msg);
+    free(prevMsg.msg);
 }
 
 OptionCoordinates printMenu(MDArray courses, int *highlightedOptions, int depth, int *scrollOffsets) {
     OptionCoordinates menuSize;
     OptionCoordinates printPos;
     menuSize.depth = 0;
-    int *widths = getWidths(strlen(SEPERATOR));
+    int *widths = getWidths();
     char *name;
     int emptyRowOptions = 0;
     int terminalHeight = trows() - 1;
@@ -149,13 +153,9 @@ char *getModuleContentName(MDArray modules, OptionCoordinates printPos, int *hig
 }
 
 void addOption(char *name, int optionDepth, _Bool isHighlighted, int widthIndex, int width) {
-
     if (widthIndex == 1 || widthIndex == 2)
         printf("%s", SEPERATOR);
 
-    if (name == NULL) {
-        msgErr("Invalid option name. Expected string, got NULL");
-    }
     if (isHighlighted) {
         printHighlightedOption(name, width);
     }
@@ -199,40 +199,13 @@ void printOption(char *optionName, int width) {
     }
 }
 
-int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
-    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
-    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
-    int height;
-    switch (depth) {
-        case COURSES_DEPTH:
-            height = courses.len;
-            break;
-        case TOPICS_DEPTH:
-            height = topics.len;
-            break;
-        case MODULES_DEPTH:
-            height = modules.len;
-            break;
-        case MODULE_CONTENTS_DEPTH1:
-            height = 1;
-        case MODULE_CONTENTS_DEPTH2:
-            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
-                height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
-            else
-                height = -1;
-            break;
-        default:
-            height = -1;
-    }
-    return height;
-}
-
-int *getWidths(int sepLength) {
+int *getWidths() {
+    int sepLength = strlen(SEPERATOR);
     int *widthOfColumns = malloc(sizeof(int) * NR_OF_WIDTHS);
     int availableColumns = tcols();
     widthOfColumns[0] = (availableColumns / 6) - sepLength;
     widthOfColumns[1] = (availableColumns / 3) - sepLength;
-    widthOfColumns[2] = (availableColumns / 2);
+    widthOfColumns[2] = (availableColumns / 2) + 1;
     return widthOfColumns;
 }
 

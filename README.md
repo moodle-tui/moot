@@ -49,11 +49,22 @@ You will be presented with [lf](https://github.com/gokcehan/lf) like interface,
 where the middle column is the current column you are navigating in.
 
 ### Commands
-These are commands, that moot interface currently supports. More comming soon.
+These are commands, that moot interface currently supports.
 - To move around, us the arrow keys or vim equivalents (`h`, `j`, `k`, `l`).
 - To quit, press `q`.
 - To download a file, hover it and press `s`.
 - To upload files, hover desired module and press `u`. (Only assignments currently supported)
+
+### Configuration
+App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
+
+Format: `<property> = <value>`
+
+Currently supported properties:
+- `token` (required).
+    Should be equal to your personal moodle token.
+- `upload_command`.
+    Should return newline seperated file paths to stdout.
 
 ## Installing
 Currently we don't provide any prebuilt binaries, so one has to build for himself and put the final executable in [path](https://en.wikipedia.org/wiki/PATH_(variable))
@@ -72,17 +83,6 @@ While it has only been built and tested on linux, it is coded with portability a
 #### Configuring
 Compiling (compiler, target executable, etc) can be configured for your system
 in the `config.mk` file.
-
-### Configuration
-App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
-
-Format: `<property> = <value>`
-
-Currently supported properties:
-- `token` (required).
-    Should be equal to your personal moodle token.
-- `upload_command`.
-    Should return newline seperated file paths to stdout.
 
 #### Building
 

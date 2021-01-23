@@ -4,52 +4,101 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
+
 #include "rlutil.h"
 #include "app.h"
 #include "moodle.h"
 
-Action getAction(MDArray courses, KeyDef keyDef, int depth, int currentMaxDepth, int depthHeight) {
+Action getAction(int key) {
     Action action;
-    switch (keyDef) {
-        case KD_RIGHT:
-            if (depth < currentMaxDepth)
-                action = ACTION_GO_RIGHT;
-            else
-                action = ACTION_INVALID;
+    switch (key) {
+        case 108: // l
+        case KEY_RIGHT:
+        case 10: // enter
+            action = ACTION_GO_RIGHT;
             break;
-        case KD_DOWN:
-            if (depthHeight == 1)
-                action = ACTION_INVALID;
-            else 
-                action = ACTION_GO_DOWN;
+        case 106: // j
+        case KEY_DOWN:
+            action = ACTION_GO_DOWN;
             break;
-        case KD_LEFT:
-            if (depth != 0)
-                action = ACTION_GO_LEFT;
-            else
-                action = ACTION_INVALID;
+        case 104: // h
+        case KEY_LEFT:
+            action = ACTION_GO_LEFT;
             break;
-        case KD_UP:
-            if (depthHeight == 1)
-                action = ACTION_INVALID;
-            else
-                action = ACTION_GO_UP;
+        case 107: // k
+        case KEY_UP:
+            action = ACTION_GO_UP;
             break;
-        case KD_DOWNLOAD:
-            action = ACTION_DOWNLOAD;
+        case KEY_ESCAPE:
+            action = ACTION_DISMISS_MSG;
             break;
-        case ACTION_UPLOAD:
+        case 117: // u
             action = ACTION_UPLOAD;
             break;
-        case KD_QUIT:
+        case 115: // s
+            action = ACTION_DOWNLOAD;
+            break;
+        case 113: // q
             action = ACTION_QUIT;
             break;
     }
     return action;
 }
 
+void validateAction(Action *action, MDArray courses, int *highlightedOptions, int depth, int currentMaxDepth) {
+    int depthHeight = getDepthHeight(depth, courses, highlightedOptions);
+    switch (*action) {
+        case ACTION_GO_RIGHT:
+            if (depth == currentMaxDepth)
+                *action = ACTION_INVALID;
+            break;
+        case ACTION_GO_DOWN:
+            if (depthHeight == 1)
+                *action = ACTION_INVALID;
+            break;
+        case ACTION_GO_LEFT:
+            if (depth == 0)
+                *action = ACTION_INVALID;
+            break;
+        case ACTION_GO_UP:
+            if (depthHeight == 1)
+                *action = ACTION_INVALID;
+            break;
+        default:
+            break;
+    }
+}
+
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
+    MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
+    MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
+    int height;
+    switch (depth) {
+        case COURSES_DEPTH:
+            height = courses.len;
+            break;
+        case TOPICS_DEPTH:
+            height = topics.len;
+            break;
+        case MODULES_DEPTH:
+            height = modules.len;
+            break;
+        case MODULE_CONTENTS_DEPTH1:
+            height = 1;
+        case MODULE_CONTENTS_DEPTH2:
+            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
+                height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
+            else
+                height = -1;
+            break;
+        default:
+            height = -1;
+    }
+    return height;
+}
+
 void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
-        int *depth, int *scrollOffsets, char *uploadCommand, Error *error, MDError *mdError) {
+        int *depth, int *scrollOffsets, char *uploadCommand, Message *msg) {
     int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
     MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
     MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
@@ -71,12 +120,16 @@ void doAction(Action action, MDArray courses, MDClient *client, int *highlighted
             goUp(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
             resetNextDepth(highlightedOptions, *depth, scrollOffsets);
             break;
+        case ACTION_DISMISS_MSG:
+            msgInit(msg);
+            break;
         case ACTION_DOWNLOAD:
-            mdFile = getMDFile(courses, highlightedOptions);
-            downloadFile(mdFile, client);
+            mdFile = getMDFile(modules, highlightedOptions, *depth, msg);
+            if (!checkIfMsgBad(*msg))
+                downloadFile(mdFile, client, msg);
             break;
         case ACTION_UPLOAD:
-            uploadFiles(client, MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]], uploadCommand, error, mdError);
+            uploadFiles(client, *depth, modules, highlightedOptions, uploadCommand, msg);
             break;
         default:
             break;
@@ -128,81 +181,101 @@ void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets) {
     }
 }
 
-MDFile getMDFile(MDArray courses, int *highlightedOptions) {
-    MDArray topics = MD_COURSES(courses)[highlightedOptions[0]].topics;
-    MDArray modules = MD_TOPICS(topics)[highlightedOptions[1]].modules;
+MDFile getMDFile(MDArray modules, int *highlightedOptions, int depth, Message *msg) {
     MDFile mdFile;
-    if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[2]].type == MD_MOD_RESOURCE) {
+    if (depth < MODULES_DEPTH) {
+        createMsg(msg, MSG_NOT_FILE, NULL, MSG_TYPE_WARNING);
+        return mdFile;
+    }
+    MDModule module = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]];
+    if (module.type == MD_MOD_RESOURCE) {
         MDModResource resource;
-        resource = MD_MODULES(modules)[highlightedOptions[2]].contents.resource;
-        mdFile = MD_FILES(resource.files)[highlightedOptions[4]];
+        resource = module.contents.resource;
+        mdFile = MD_FILES(resource.files)[highlightedOptions[MODULES_DEPTH]];
     }
     else
-        msgSmall("Couldn't get file", RED);
+        createMsg(msg, MSG_NOT_FILE, NULL, MSG_TYPE_WARNING);
 
     return mdFile;
 }
 
-void downloadFile(MDFile mdFile, MDClient *client) {
+void downloadFile(MDFile mdFile, MDClient *client, Message *msg) {
+    errno = 0;
+    MDError mdError;
     FILE* file = fopen(mdFile.filename, "w");
-    char msg[1000];
-    if (!file) {
-        sprintf(msg, "Couldn't open %s for writing", mdFile.filename);
-        msgErr(msg);
+    if (errno) {
+        createMsg(msg, MSG_CANNOT_OPEN_DOWNLOAD_FILE, strerror(errno), MSG_TYPE_ERROR);
+        return;
     }
-    MDError err;
-    sprintf(msg, "Downloading: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    msgSmall(msg, BLUE);
-    md_client_download_file(client, &mdFile, file, &err);
-    sprintf(msg, "Downloaded: %s [%ldK]", mdFile.filename, mdFile.filesize / 1000);
-    msgSmall(msg, GREEN);
+    md_client_download_file(client, &mdFile, file, &mdError);
     fclose(file);
-
-    if (err) {
-        char msg[100];
-        sprintf(msg, "%s", md_error_get_message(err));
-        msgErr(msg);
+    if (mdError) {
+        createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
+        return;
     }
+    createMsg(msg, MSG_DOWNLOADED, mdFile.filename, MSG_TYPE_SUCCESS);
+    free(mdFile.filename);
 }
 
-void uploadFiles(MDClient *client, MDModule module, char *uploadCommand, Error *error, MDError *mdError) {
-    if (!uploadCommand) {
+void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg) {
+    if (depth != MODULES_DEPTH) {
+        createMsg(msg, MSG_NOT_ASSIGNMENT_OR_WORKSHOP, NULL, MSG_TYPE_WARNING);
+        return;
+    }
+    MDModule module = MD_MODULES(modules)[highlightedOptions[depth]];
+    if (module.type != MD_MOD_ASSIGNMENT && module.type != MD_MOD_WORKSHOP) {
+        createMsg(msg, MSG_NOT_ASSIGNMENT_OR_WORKSHOP, NULL, MSG_TYPE_WARNING);
+        return;
+    }
+    if (!uploadCommand || !uploadCommand[0]) {
         uploadCommand = UPLOAD_COMMAND;
     }
-    FILE *uploadPathsPipe = openFileSelectionProcess(uploadCommand, error);
-    if (*error)
+    MDError mdError;
+    FILE *uploadPathsPipe = openFileSelectionProcess(uploadCommand, msg);
+    if (msg->type == MSG_TYPE_ERROR)
         return;
     MDArray fileNames = MD_ARRAY_INITIALIZER;
-    for (int i = 0;; ++i) {
-        char *fileName = xmalloc(sizeof(char) * UPLOAD_FILE_LENGTH, error);
-        if (*error)
+    int nrOfFiles = 0;
+    for (; ; ++nrOfFiles) {
+        char *fileName = malloc(sizeof(char) * UPLOAD_FILE_LENGTH);
+        if (!fileName) {
+            createMsg(msg, MSG_CANNOT_ALLOCATE, NULL, MSG_TYPE_ERROR);
+            pclose(uploadPathsPipe);
             return;
+        }
         if (!fgets(fileName, UPLOAD_FILE_LENGTH, uploadPathsPipe))
             break;
-
         removeNewline(fileName);
-        MDError mdError = MD_ERR_NONE;
         md_array_append(&fileNames, &fileName, sizeof(char *), &mdError);
+        if (mdError) {
+            createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
+            pclose(uploadPathsPipe);
+            return;
+        }
     }
     pclose(uploadPathsPipe);
     hidecursor();
     if (fileNames.len == 0) {
-        msgSmall("No files chosen", RED);
+        createMsg(msg, MSG_NO_FILES_CHOSEN, NULL, MSG_TYPE_WARNING);
         return;
     }
-    if (!*mdError && !*error)
-        startUpload(client, module, fileNames, mdError);
-    if (!*mdError)
-        msgSmall(UPLOAD_SUCCESFUL_MSG, UPLOAD_SUCCESFUL_MSG_COLOR);
+    startUpload(client, module, fileNames, msg);
+    if (mdError) {
+        createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
+        return;
+    }
+
+    char *nrOfFilesStr = getStr(nrOfFiles);
+    createMsg(msg, MSG_UPLOADED, nrOfFilesStr, MSG_TYPE_SUCCESS);
+    free(nrOfFilesStr);
     md_array_free(&fileNames);
 }
 
-FILE *openFileSelectionProcess(char *uploadCommand, Error *error) {
+FILE *openFileSelectionProcess(char *uploadCommand, Message *msg) {
     errno = 0;
     FILE *uploadPathsPipe = popen(uploadCommand, "r");
     if (errno) {
-        app_error_set_message(strerror(errno));
-        *error = UPLOAD_ERR_EXEC;
+        createMsg(msg, MSG_CANNOT_EXEC_UPLOAD_CMD, strerror(errno), MSG_TYPE_ERROR);
     }
     return uploadPathsPipe;
 }
@@ -213,19 +286,16 @@ void removeNewline(char *string) {
         string[fileNameLen - 1] = 0;
 }
 
-void startUpload(MDClient *client, MDModule module, MDArray fileNames, MDError *mdError) {
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *msg) {
+    MDError mdError = MD_ERR_NONE;
     if (module.type == MD_MOD_ASSIGNMENT) {
-        md_client_mod_assign_submit(client, &module, &fileNames, NULL, mdError);
+        md_client_mod_assign_submit(client, &module, &fileNames, NULL, &mdError);
     }
     else if (module.type == MD_MOD_WORKSHOP) {
-        msgSmall("Workshop upload is not supported yet", RED);
+        createMsg(msg, "Workshop upload is not supported yet", NULL, MSG_TYPE_INFO);
         //md_client_mod_workshop_submit(client, &module, &MD_MAKE_ARR(cchar *, filePath), NULL, "hmmm", &error);
     }
-    else {
-        msgSmall("This is not a workshop or assignment", RED);
-    }
-    if (*mdError)
-        msgErr(md_error_get_message(*mdError));
+    if (mdError)
+        createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
 }
-
 

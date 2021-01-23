@@ -31,15 +31,15 @@ typedef enum Property {
     NR_OF_PROPERTIES,
 } Property;
 
-char *getConfigPath(Error *error);
-char *getSysConfigHome();
-FILE *openConfigFile(char *configPath, Error *error);
+void initConfigValues(ConfigValues *configValues);
+char *getConfigPath(Message *msg);
+FILE *openConfigFile(char *configPath, Message *msg);
 char *joinPaths(char *string1, char *string2);
-void processLine(char *line, ConfigValues *configValues, Error *error);
-char *sreadProperty(char *line, int *readPos, Error *error);
-Property getProperty(char *propertyStr, Error *error);
+char *joinPaths(char *string1, char *string2);
+void processLine(char *line, ConfigValues *configValues, Message *msg);
+Property getProperty(char *propertyStr, Message *msg);
 void skipSeperator(int *readPos);
-void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Error *error);
+void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Message *msg);
 char *sreadToken(char *line, int *readPos, Error *error);
 char *sreadUntil(char *line, char mark, int limit, int *readPos, bool ignoreBlank);
 
