@@ -49,7 +49,7 @@ moot: $(APP_OBJ) $(MOODLE_OBJ) $(LIB_OBJ) $(GUMBO_OBJ)
 
 
 HTML = app/html_renderer
-html_renderer: $(GUMBO_OBJ) $(LIB)/utf8.o $(LIB)/wcwidth.o
+html_renderer: $(GUMBO_OBJ) $(LIB)/utf8.o $(LIB)/wcwidth.o $(APP)/util.o $(APP)/message.o $(APP)/ui.o $(LIB)/rlutil.o
 	$(CC) $(CCFLAGS) $(HTML).c $^ $(INCLUDE_LIB) $(LDLIBS) -o $(HTML)
 
 TEST = moodle/test/test

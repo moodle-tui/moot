@@ -14,78 +14,88 @@ static GumboTag inlineTags[] = {
 
 typedef struct RenderState {
     HtmlRender *render;
-    bool *ok;
+    ArrayWrap lines;
+    bool trailingNewline;
+    Message *msg;
 } RenderState;
 
-uint renderNode(GumboNode *node, uint thisLineWidth, RenderState state);
-void renderNodeBlock(GumboNode *node, RenderState state);
+bool isOk(Message *message);
+void addLine(RenderState *state, char *line);
+bool hasTag(GumboNode *node, GumboTag tag);
+bool isTagInline(GumboTag tag);
+bool canSkipNode(GumboNode *node);
+char *trimWhitespace(const char *text, Message *message);
+bool isContextInline(GumboNode *node);
+void renderNodeInline(GumboNode *node, char **line, int *length, RenderState *state);
+void renderNodeBlock(GumboNode *node, RenderState *state);
 
-void *mallocOk(size_t size, bool *ok) {
-    void *data = malloc(size);
-    if (!data)
-        *ok = false;
-    return data;
+bool isOk(Message *message) {
+    return message->type != MSG_TYPE_ERROR;
 }
 
-void *callocOk(size_t n, size_t size, bool *ok) {
-    void *data = calloc(n, size);
-    if (!data)
-        *ok = false;
-    return data;
+ArrayWrap wrapArray(void *dataPtr, int *lenPtr, int size) {
+    ArrayWrap array = {
+        .data = dataPtr,
+        .len = lenPtr,
+        .size = size,
+        .cap = *lenPtr,
+    };
+    return array;
 }
 
-void *reallocOk(void *data, size_t size, bool *ok) {
-    data = realloc(data, size);
-    if (!data)
-        *ok = false;
-    return data;
+void arrayAppend(ArrayWrap *array, const void *elem, Message *message) {
+    if (array->cap <= *array->len) {
+        array->cap = array->cap ? array->cap * 2 : 1;
+        *array->data = xrealloc(*array->data, array->cap * array->size, message);
+    }
+    if (*array->data) {
+        memcpy((char *)*array->data + *array->len * array->size, elem, array->size);
+        ++(*array->len);
+    } else {
+        *array->len = array->cap = 0;
+    }
 }
 
-HtmlRender renderHtml(const char *html) {
+void arrayShrink(ArrayWrap *array, Message *message) {
+    if (array->cap != *array->len) {
+        *array->data = xrealloc(*array->data, *array->len * array->size, message);
+        array->cap = *array->len;
+    }
+}
+
+HtmlRender renderHtml(const char *html, Message *message) {
     HtmlRender render = {.lineCount = 0, .lines = NULL};
     GumboOptions opt = kGumboDefaultOptions;
-    // opt.fragment_context = GUMBO_TAG_BODY;
     opt.fragment_context = GUMBO_TAG_HTML;
     GumboOutput *out = gumbo_parse_with_options(&opt, html, strlen(html));
     if (out) {
         RenderState state = {
             .render = &render,
-            .ok = &(bool){true},
+            .msg = message,
+            .trailingNewline = false,
+            .lines = wrapArray(&render.lines, &render.lineCount, sizeof(char *)),
         };
-        renderNodeBlock(out->root, state);
+        renderNodeBlock(out->root, &state);
     }
     gumbo_destroy_output(&opt, out);
     return render;
 }
 
-const char *sliceText(const char *text, uint width) {
-    int len = strlen(text), wcWidth = 0;
-    uint sliceWidth = 0;
-    while (sliceWidth + wcWidth < width && *text) {
-        Rune ch;
-        uint chWidth = utf8decode(text, &ch, len);
-        if (ch == '\n') {
-            text += chWidth;
-            break;
-        }
-        wcWidth = wcwidth(ch);
-        if (sliceWidth + wcWidth <= width) {
-            text += chWidth;
-            sliceWidth += wcWidth;
-            len -= chWidth;
+void addLine(RenderState *state, char *line) {
+    if (state->render->lineCount && state->trailingNewline) {
+        char *empty = xcalloc(1, 1, state->msg);
+        if (isOk(state->msg)) {
+            arrayAppend(&state->lines, &empty, state->msg);
+            state->trailingNewline = false;
         }
     }
-    return text;
+    if (isOk(state->msg)) {
+        arrayAppend(&state->lines, &line, state->msg);
+    }
 }
 
-void addLine(HtmlRender *render, char *line, bool *ok) {
-    render->lines = realloc(render->lines, (render->lineCount + 1) * sizeof(char *));
-    if (render->lines) {
-        render->lines[render->lineCount++] = line;
-    } else {
-        render->lineCount = 0;
-        *ok = false;
-    }
+bool hasTag(GumboNode *node, GumboTag tag) {
+    return node->type == GUMBO_NODE_ELEMENT && node->v.element.tag == tag;
 }
 
 bool isTagInline(GumboTag tag) {
@@ -97,9 +107,13 @@ bool isTagInline(GumboTag tag) {
     return false;
 }
 
-char *trimWhitespace(const char *text, bool *ok) {
-    char *buffer = callocOk(strlen(text) + 1, 1, ok);
-    if (*ok) {
+bool canSkipNode(GumboNode *node) {
+    return hasTag(node, GUMBO_TAG_STYLE) || hasTag(node, GUMBO_TAG_SCRIPT);
+}
+
+char *trimWhitespace(const char *text, Message *message) {
+    char *buffer = xcalloc(strlen(text) + 1, 1, message);
+    if (isOk(message)) {
         int bufferLength = 0;
         // Trim leading whitespace.
         bool ignoreWhitespace = true;
@@ -119,7 +133,7 @@ char *trimWhitespace(const char *text, bool *ok) {
             buffer[i] = 0;
         }
     }
-    return buffer;
+    return xrealloc(buffer, strlen(buffer), message);
 }
 
 bool isContextInline(GumboNode *node) {
@@ -134,129 +148,82 @@ bool isContextInline(GumboNode *node) {
     return isInline;
 }
 
-void renderNodeInline(GumboNode *node, char **line, int *length, RenderState state) {
+void renderNodeInline(GumboNode *node, char **line, int *length, RenderState *state) {
     // TODO: add inline node clustering
     if (node->type == GUMBO_NODE_TEXT) {
         int prevLength = *length;
         *length = *length + strlen(node->v.text.text);
-        *line = reallocOk(*line, *length + 1, state.ok);
+        *line = xrealloc(*line, *length + 1, state->msg);
         if (*line) {
             strcpy(*line + prevLength, node->v.text.text);
         }
     }
     if (node->type == GUMBO_NODE_ELEMENT) {
-        for (int i = 0; i < node->v.element.children.length && *state.ok; ++i) {
+        for (int i = 0; i < node->v.element.children.length && isOk(state->msg); ++i) {
             GumboNode *child = ((GumboNode **)node->v.element.children.data)[i];
             renderNodeInline(child, line, length, state);
         }
     }
 }
 
-void renderNodeBlock(GumboNode *node, RenderState state) {
-    for (int i = 0; i < node->v.element.children.length && *state.ok; ++i) {
+void renderNodeBlock(GumboNode *node, RenderState *state) {
+    for (int i = 0; i < node->v.element.children.length && isOk(state->msg); ++i) {
         GumboNode *child = ((GumboNode **)node->v.element.children.data)[i];
+        if (canSkipNode(child)) {
+            continue;
+        }
         if (isContextInline(child)) {
+            state->trailingNewline |= hasTag(child, GUMBO_TAG_P);
             char *line = NULL;
             renderNodeInline(child, &line, &(int){0}, state);
             if (line) {
-                char *trimmed = trimWhitespace(line, state.ok);
+                char *trimmed = trimWhitespace(line, state->msg);
                 free(line);
                 if (trimmed && *trimmed) {
-                    addLine(state.render, trimmed, state.ok);
-                    if (!*state.ok) {
-                        state.render->lineCount = 0;
-                    }
+                    addLine(state, trimmed);
                 }
             }
+            state->trailingNewline |= hasTag(child, GUMBO_TAG_P);
         } else {
             renderNodeBlock(child, state);
         }
     }
 }
 
-WrappedLines wrapHtmlRender(HtmlRender render, uint width) {
+WrappedLines wrapHtmlRender(HtmlRender render, int width, Message *message) {
+    // This implementation relies on the html rendering algorithm, which leaves
+    // only spaces as whitespace.
     WrappedLines result = {.count = 0, .lines = NULL};
+    ArrayWrap resultWrap = wrapArray(&result.lines, &result.count, sizeof(Line));
     if (width < 2) {
         return result;
     }
-    size_t capacity = 0;
-    bool ok = true;
-    for (int i = 0; i < render.lineCount && ok; ++i) {
-        const char *begin = render.lines[i];
-        do {
-            const char *end = sliceText(begin, width);
-            if (result.count >= capacity) {
-                capacity = capacity ? capacity * 2 : 1;
-                result.lines = reallocOk(result.lines, capacity * sizeof(Line), &ok);
-            }
-            if (result.lines) {
-                result.lines[result.count].text = begin;
-                result.lines[result.count].length = end - begin;
-                ++result.count;
-            } else {
-                result.count = 0;
-            }
-            begin = end;
-        } while (*begin && ok);
-    }
-    result.lines = realloc(result.lines, result.count * sizeof(Line));
-    return result;
-}
-
-const char *const BREAK_CHARS = " -()/";
-
-WrappedLines wordWrapHtmlRender(HtmlRender render, uint width) {
-    // Assuming that only whitespace are spaces and not consecutive.
-    WrappedLines result = {.count = 0, .lines = NULL};
-    if (width < 2) {
-        return result;
-    }
-    size_t capacity = 0;
-    bool ok = true;
-    for (int i = 0; i < render.lineCount && ok; ++i) {
-        const char *it = render.lines[i], *lastBreakPos;
+    for (int i = 0; i < render.lineCount && isOk(message); ++i) {
+        const char *it = render.lines[i];
         do {
             // Skip leading space.
             if (*it == ' ') {
                 ++it;
             }
-            const char *begin = it, *lastOne = NULL;
-            lastBreakPos = NULL;
-            uint sliceWidth = 0;
+            const char *begin = it, *lastBreakPos = NULL;
+            int sliceWidth = 0;
             while (sliceWidth < width && *it) {
-                if (strchr(BREAK_CHARS, *it)) {
+                if (strchr(BREAK_ON_CHARS, *it) && it - begin > 0) {
                     lastBreakPos = it;
                 }
-                lastOne = it;
                 Rune ch;
-                size_t chLength = utf8decodeNullTerm(it, &ch);
-                it += chLength;
-                // FIXME - may return negative number.
+                it += utf8decodeNullTerm(it, &ch);
                 sliceWidth += wcwidth(ch);
             }
             const char *end = it;
-            if (sliceWidth >= width && !strchr(BREAK_CHARS, *it) && !strchr(BREAK_CHARS, *lastOne)) {
-                if (lastBreakPos && lastBreakPos - begin > 1) {
-                    end = lastBreakPos + 1;
-                } else {
-                    end = lastOne;
-                }
+            if (sliceWidth >= width && lastBreakPos && !strchr(BREAK_ON_CHARS, *it)) {
+                end = lastBreakPos + 1;
             }
-            if (result.count >= capacity) {
-                capacity = capacity ? capacity * 2 : 1;
-                result.lines = reallocOk(result.lines, capacity * sizeof(Line), &ok);
-            }
-            if (result.lines) {
-                result.lines[result.count].text = begin;
-                result.lines[result.count].length = end - begin;
-                ++result.count;
-            } else {
-                result.count = 0;
-            }
+            arrayAppend(&resultWrap, &(Line){.text = begin, .length = end - begin}, message);
             it = end;
-        } while (*it && ok);
+        } while (*it && isOk(message));
     }
-    result.lines = realloc(result.lines, result.count * sizeof(Line));
+    arrayShrink(&resultWrap, message);
     return result;
 }
 
@@ -274,8 +241,9 @@ void freeWrappedLines(WrappedLines lines) {
 // int main() {
 //     char *html;
 //     scanf("%m[^#]", &html);
-//     HtmlRender render = renderHtml(html);
-//     WrappedLines lines = wordWrapHtmlRender(render, 45);
+//     Message message = {.msg = NULL, .type = MSG_TYPE_NONE};
+//     HtmlRender render = renderHtml(html, &message);
+//     WrappedLines lines = wrapHtmlRender(render, 45, &message);
 //     for (int i = 0; i < lines.count; ++i) {
 //         fwrite(lines.lines[i].text, 1, lines.lines[i].length, stdout);
 //         fputc('\n', stdout);
