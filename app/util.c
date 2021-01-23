@@ -14,7 +14,18 @@ int getNrOfDigits(int number) {
 }
 
 void *xmalloc(size_t size, Message *msg) {
-    void *data = malloc(size);
+    return xrealloc(NULL, size, msg);
+}
+
+void *xrealloc(void *data, size_t size, Message *msg) {
+    data = realloc(data, size);
+    if (!data && size)
+        createMsg(msg, MSG_CANNOT_ALLOCATE, NULL, MSG_TYPE_ERROR);
+    return data;
+}
+
+void *xcalloc(size_t n, size_t size, Message *msg) {
+    void *data = calloc(n, size);
     if (!data && size)
         createMsg(msg, MSG_CANNOT_ALLOCATE, NULL, MSG_TYPE_ERROR);
     return data;

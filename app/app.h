@@ -133,6 +133,8 @@ void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *
 char *getStr(int n);
 int getNrOfDigits(int number);
 void *xmalloc(size_t size, Message *msg);
+void *xrealloc(void *data, size_t size, Message *msg);
+void *xcalloc(size_t n, size_t size, Message *msg);
 int getNrOfRecurringMessages(Message msg, Message *prevMsg, Action action);
 
 // config.c
