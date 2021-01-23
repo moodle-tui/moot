@@ -547,6 +547,7 @@ static bool intable(struct width_interval* table, int table_length, int c) {
         return false;
 }
 
+
 int wcwidth(wchar_t ucs) {
 	// NOTE: created by hand, there isn't anything identifiable other than
 	// general Cf category code to identify these, and some characters in Cf
@@ -562,7 +563,7 @@ int wcwidth(wchar_t ucs) {
         }
 
         // C0/C1 control characters.
-        if (ucs < 32 || (0x07F <= ucs && ucs < 0x0A0)) return -1;
+        if (ucs < 32 || (0x07F <= ucs && ucs < 0x0A0)) return 0;
 
         // Combining characters with zero width.
         if (intable(ZERO_WIDTH, sizeof(ZERO_WIDTH)/sizeof(struct width_interval), ucs)) return 0;
