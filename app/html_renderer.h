@@ -1,3 +1,14 @@
+/*
+ * Copyright (C) 2020 Nojus Gudinavičius nojus.gudinavicius@gmail.com Licensed
+ * as with https://github.com/moodle-tui/moot
+ *
+ * Hacky and very limited html renderer to text.
+ *
+ * Currently, it only extracts text and tries to handle whitespace and line
+ * breaks close to normal renderers. This is mainly usable for not heavily
+ * formated html, such as instructions or comments in on moodle courses.
+ */
+
 #ifndef __HTML_RENDERER_H
 #define __HTML_RENDERER_H
 #include "message.h"
@@ -5,7 +16,9 @@
 
 // BREAK_ON_CHARS contains all characters that are considered good positions to
 // break up text when wrapping.
-#define BREAK_ON_CHARS " -/"
+#define ZERO_WIDTH_SPACE "\xe2\x80\x8b"
+#define BREAK_ON_CHARS " " ZERO_WIDTH_SPACE
+// #define BREAK_ON_CHARS " "
 
 // HtmlRender is the html rendered to text. It should not be used directly, but
 // wrapped first. 
