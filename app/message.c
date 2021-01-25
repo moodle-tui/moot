@@ -17,8 +17,8 @@ void msgInit(Message *msg) {
     };
 }
 
-bool checkIfMsgBad(Message msg) {
-    return (msg.type == MSG_TYPE_BAD_ACTION || msg.type == MSG_TYPE_ERROR || msg.type == MSG_TYPE_WARNING);
+bool checkIfAbort(Message msg) {
+    return (msg.type == MSG_TYPE_BAD_ACTION || msg.type == MSG_TYPE_ERROR);
 }
 
 void printMsg(Message msg, int nrOfRecurringMessages) {

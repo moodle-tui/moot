@@ -14,7 +14,7 @@ typedef const char cchar;
 #define MSG_UPLOADED "Succesfully uploaded %s files"
 
 // bad action messages
-#define MSG_NO_FILES_CHOSEN "No files chosen"
+#define MSG_NO_FILE_CHOSEN "No file chosen"
 #define MSG_NOT_ASSIGNMENT_OR_WORKSHOP "This is not an assignment or a workshop"
 #define MSG_NOT_FILE "This is not a file"
 
@@ -43,7 +43,7 @@ typedef enum MsgType {
 typedef enum MsgColors {
     MSG_COLOR_SUCCESS = GREEN,
     MSG_COLOR_INFO = BLUE,
-    MSG_COLOR_BAD_ACTION = GREY, 
+    MSG_COLOR_BAD_ACTION = MAGENTA, 
     MSG_COLOR_WARNING = LIGHTRED,
     MSG_COLOR_ERROR = RED,
 } MsgColors;
