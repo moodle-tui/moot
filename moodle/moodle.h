@@ -26,7 +26,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdbool.h>
-
+#include "defines.h"
 
 // Before using any of the library functions, one must call md_init to initialize it.
 void md_init();
@@ -125,6 +125,8 @@ typedef struct MDClient {
     int userid;
     long uploadLimit;
     char *token, *website;  // private
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_CLIENT    
 } MDClient;
 
 // MDModType is the type of a moodle module. MD_MOD_UNSUPPORTED will likely
@@ -152,6 +154,8 @@ typedef enum MDTextFormat {
 typedef struct MDRichText {
     char *text;
     MDTextFormat format;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_RICH_TEXT    
 } MDRichText;
 
 // MDFile represents a file on moodle system that can be downloaded using md_client_download_file.
@@ -159,6 +163,8 @@ typedef struct MDFile {
     char *filename;
     long filesize;
     char *url;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_FILE    
 } MDFile;
 
 // MDSubmissionStatus denotes the status of a submission, as it may be changed by teachers.
@@ -174,12 +180,16 @@ typedef struct MDFileSubmission {
     int maxUploadedFiles;  // may be equal to MD_NO_FILE_LIMIT.
     long maxSubmissionSize;
     char *acceptedFileTypes;  // may be NULL if file types are not limited.
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_FILE_SUBMISSION    
 } MDFileSubmission;
 
 // MDTextSubmission, if enabled, allows to submit single or multiple files.
 typedef struct MDTextSubmission {
     MDSubmissionStatus status;
     int wordLimit;  // Equal to MD_NO_WORD_LIMIT if not limited.
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_TEXT_SUBMISSION    
 } MDTextSubmission;
 
 // MDModAssignmentState notes the state of an assignment.
@@ -198,6 +208,8 @@ typedef struct MDModAssignmentStatus {
     bool graded;
     char *grade;
     // TODO: add or move feedback?
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_ASSIGNMENT_STATUS    
 } MDModAssignmentStatus;
 
 // MDModWorkshopStatus holds additional information about a workshop, currently
@@ -208,6 +220,8 @@ typedef struct MDModWorkshopStatus {
     time_t submitDate;
     MDArray submittedFiles;  // Array with elements of type MDFile.
     MDRichText submittedText;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_WORKSHOP_STATUS    
 } MDModWorkshopStatus;
 
 // MDModAssignment represents moodle assignment. Currently it only supports file submission, which
@@ -221,6 +235,8 @@ typedef struct MDModAssignment {
     MDTextSubmission textSubmission;
 
     MDModAssignmentStatus status; // needs to be loaded separately.
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_ASSIGNMENT    
 } MDModAssignment;
 
 // MDModWorkshop represents moodle workshop. Currently it only supports file submission, which
@@ -233,6 +249,8 @@ typedef struct MDModWorkshop {
     MDFileSubmission fileSubmission;
     MDTextSubmission textSubmission;
     MDModWorkshopStatus status; // needs to be loaded separately.
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_WORKSHOP    
 } MDModWorkshop;
 
 // MDModResource represents moodle resource. Files from it may be downloaded using md_client_download_file.
@@ -240,12 +258,16 @@ typedef struct MDModResource {
     MDRichText description;
     // Array with elements of type MDFile.
     MDArray files;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_RESOURCE    
 } MDModResource;
 
 // MDModUrl represents moodle url module.
 typedef struct MDModUrl {
     MDRichText description;
     char *name, *url;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MOD_URL    
 } MDModUrl;
 
 // MDModule represents a general moodle module that specific module under contents. Modules are contained
@@ -260,6 +282,8 @@ typedef struct MDModule {
         MDModResource resource;
         MDModUrl url;
     } contents;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_MODULE    
 } MDModule;
 
 // MDTopic represents a moodle topic into which courses are divided,
@@ -268,6 +292,8 @@ typedef struct MDTopic {
     char *name;
     MDRichText summary;
     MDArray modules;  // Array with elements of type MDModule.
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_TOPIC    
 } MDTopic;
 
 // MDCourse represents a moodle course which contains topics;
@@ -276,6 +302,8 @@ typedef struct MDCourse {
     char *name;
     // Array with elements of type MDTopic.
     MDArray topics;
+    MD_EXTRA_FIELD
+    MD_EXTRA_FIELD_COURSE    
 } MDCourse;
 
 // MDLoadedStatus is a type to hold preloaded module statuses using
