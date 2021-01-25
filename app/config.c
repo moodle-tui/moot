@@ -11,15 +11,15 @@
 void readConfigFile(ConfigValues *configValues, Message *msg) {
     initConfigValues(configValues);
     char *configPath = getConfigPath(msg);
-    if (checkIfMsgBad(*msg))
+    if (msg->type == MSG_TYPE_WARNING || msg->type == MSG_TYPE_ERROR)
         return;
 
     FILE *configFile = openConfigFile(configPath, msg);
-    if (checkIfMsgBad(*msg))
+    if (msg->type == MSG_TYPE_WARNING || msg->type == MSG_TYPE_ERROR)
         return;
 
     char *line = xmalloc(LINE_LIMIT * sizeof(char), msg);
-    if (!checkIfMsgBad(*msg)) {
+    if (msg->type != MSG_TYPE_WARNING && msg->type != MSG_TYPE_ERROR) {
         while (fgets(line, LINE_LIMIT, configFile)) {
             if (line[0] != '\n')
                 processLine(line, configValues, msg);
@@ -65,7 +65,7 @@ void processLine(char *line, ConfigValues *configValues, Message *msg) {
     char *propertyStr = sreadUntil(line, CFG_SEPERATOR, LINE_LIMIT, &readPos, 1);
 
     Property property = getProperty(propertyStr, msg);
-    if (checkIfMsgBad(*msg))
+    if (msg->type == MSG_TYPE_WARNING || msg->type == MSG_TYPE_ERROR)
         return;
 
     skipSeperator(&readPos);

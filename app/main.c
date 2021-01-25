@@ -16,6 +16,7 @@ int main() {
     msgInit(&prevMsg);
     if (!msg.msg || !prevMsg.msg) {
         printMsgNoUI((Message) {MSG_CANNOT_ALLOCATE, MSG_TYPE_ERROR});
+        return 0;
     }
     readConfigFile(&configValues, &msg);
     if (msg.msg[0]) {

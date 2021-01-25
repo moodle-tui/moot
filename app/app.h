@@ -9,10 +9,58 @@ typedef const char cchar;
 
 // message.c
 
-bool checkIfMsgBad(Message msg);
+void msgInit(Message *msg);
+bool checkIfAbort(Message msg);
 void printMsg(Message msg, int nrOfRecurringMessages);
 int msgCompare(Message msg1, Message msg2);
 void printMsgNoUI(Message msg);
+
+// action.c
+
+#define DEFAULT_UPLOAD_COMMAND "tempFile=`mktemp` && lf -selection-path $tempFile && cat $tempFile && rm $tempFile"
+#define UPLOAD_FILE_LENGTH 2048
+
+typedef enum Action {
+    ACTION_INVALID = -1,
+    ACTION_GO_RIGHT,
+    ACTION_GO_DOWN,
+    ACTION_GO_LEFT,
+    ACTION_GO_UP,
+    ACTION_DISMISS_MSG,
+    ACTION_UPLOAD,
+    ACTION_DOWNLOAD,
+    ACTION_QUIT,
+} Action;
+
+Action getAction(int key);
+void validateAction(Action *action, MDArray courses, int *highlightedOptions, int depth, int currentMaxDepth);
+
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
+
+void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
+        int *depth, int *scrollOffsets, char *uploadCommand, Message *msg);
+
+// following functions change some values, to navigate the menu
+void goRight(int *depth);
+void goDown(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
+void goLeft(int *depth, int *highlightedOptions);
+void goUp(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
+
+void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets);
+
+void downloadFile(MDClient *client, MDArray modules, int *highlightedOptions, int depth, Message *msg);
+
+// getMDFile returns currently highlighted mdFile
+void getMDFile(MDFile *mdFile, MDArray modules, int *highlightedOptions, int depth, Message *msg);
+
+void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg);
+void checkIfAssignmentOrWorkshop(MDArray modules, int *highlightedOptions, int depth, Message *msg);
+void getFileNames(MDArray *fileNames, char *uploadCommand, Message *msg);
+FILE *openFileSelectionProcess(char *uploadCommand, Message *msg);
+void readFileNames(FILE *uploadPathsPipe, MDArray *fileNames, Message *msg);
+void removeNewline(char *string);
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *msg);
+void setUploadSuccessMsg(int nrOfFilesUploaded, Message *msg);
 
 // ui.c
 
@@ -45,6 +93,7 @@ typedef struct Layout {
 void mainLoop(MDArray courses, MDClient *client, char *uploadCommand, Message *msg, Message *prevMsg);
 void savePrevMessage(Message *msg, Message *prevMsg);
 void restorePrevMessage(Message *msg, Message *prevMsg);
+int getNrOfRecurringMessages(Message msg, Message *prevMsg, Action action);
 
 // printMenu prints menu, saves height of current depth and returns menu size,
 // depth in it being the last visible depth
@@ -85,49 +134,6 @@ void printSpaces(int count);
 // getMax gets max value from array
 int getMax(int *array, int size);
 
-// action.c
-
-#define UPLOAD_COMMAND "tempFile=`mktemp` && lf -selection-path $tempFile && cat $tempFile && rm $tempFile"
-#define UPLOAD_FILE_LENGTH 2048
-
-typedef enum Action {
-    ACTION_INVALID = -1,
-    ACTION_GO_RIGHT,
-    ACTION_GO_DOWN,
-    ACTION_GO_LEFT,
-    ACTION_GO_UP,
-    ACTION_DISMISS_MSG,
-    ACTION_UPLOAD,
-    ACTION_DOWNLOAD,
-    ACTION_QUIT,
-} Action;
-
-Action getAction(int key);
-void validateAction(Action *action, MDArray courses, int *highlightedOptions, int depth, int currentMaxDepth);
-
-int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
-
-void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
-        int *depth, int *scrollOffsets, char *uploadCommand, Message *msg);
-
-// following functions change some values, to navigate the menu
-void goRight(int *depth);
-void goDown(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
-void goLeft(int *depth, int *highlightedOptions);
-void goUp(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
-
-void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets);
-
-// getMDFile returns currently highlighted mdFile
-MDFile getMDFile(MDArray modules, int *highlightedOptions, int depth, Message *msg);
-
-void downloadFile(MDFile mdFile, MDClient *client, Message *msg);
-
-void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg);
-FILE *openFileSelectionProcess(char *uploadCommand, Message *msg);
-void removeNewline(char *string);
-void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *msg);
-
 // util.c
 
 char *getStr(int n);
@@ -135,7 +141,6 @@ int getNrOfDigits(int number);
 void *xmalloc(size_t size, Message *msg);
 void *xrealloc(void *data, size_t size, Message *msg);
 void *xcalloc(size_t n, size_t size, Message *msg);
-int getNrOfRecurringMessages(Message msg, Message *prevMsg, Action action);
 
 // config.c
 

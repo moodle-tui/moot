@@ -31,18 +31,3 @@ void *xcalloc(size_t n, size_t size, Message *msg) {
     return data;
 }
 
-int getNrOfRecurringMessages(Message msg, Message *prevMsg, Action action) {
-    static Action originalAction = -1;
-    static int nrOfRecurringMessages = 0;
-    if (originalAction == -1 && msg.type != MSG_TYPE_NONE)
-        originalAction = action;
-    if (msgCompare(*prevMsg, msg) == -1) {
-        originalAction = action;
-        createMsg(prevMsg, msg.msg, NULL, msg.type);
-        nrOfRecurringMessages = 0;
-    }
-    else if (originalAction == action && msg.type != MSG_TYPE_NONE && msg.type != MSG_TYPE_DISMISSED)
-        ++nrOfRecurringMessages;
-    return nrOfRecurringMessages;
-}
-
