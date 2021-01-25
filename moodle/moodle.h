@@ -74,7 +74,7 @@ typedef struct MDArray {
 } MDArray;
 
 // MD_ARR casts generic array to specific type array (pointer).
-#define MD_ARR(array, type) ((type*)array._data)
+#define MD_ARR(array, type) ((type*)(array)._data)
 
 // MD_COURSES casts a generic array to MDCourse*.
 #define MD_COURSES(array) MD_ARR(array, MDCourse)
