@@ -13,7 +13,15 @@
 #include "utf8.h"
 #include "wcwidth.h"
 
-#define MAX_H_N 6
+#define MAX_HEADING_N 6
+#define SRC_BASE64 "Base64"
+#define IMAGE_PREFIX "Image:"
+#define BOLD_MARK "*"
+#define ITALICS_MARK "/"
+#define HEADING_MARK "#"
+#define UNORDERED_LIST_PREFIX "\xE2\x80\xA2 "
+#define MAX_INT_WIDTH 13
+#define HR_LINE "------"
 
 static GumboTag inlineTags[] = {
     GUMBO_TAG_A,   GUMBO_TAG_ABBR, GUMBO_TAG_ACRONYM, GUMBO_TAG_B, GUMBO_TAG_BDO,   GUMBO_TAG_BIG,  GUMBO_TAG_CITE,   GUMBO_TAG_CODE,   GUMBO_TAG_DFN, GUMBO_TAG_EM,  GUMBO_TAG_FONT, GUMBO_TAG_I,
@@ -22,8 +30,8 @@ static GumboTag inlineTags[] = {
 
 typedef struct RenderState {
     HtmlRender *render;
-    ArrayWrap renderWrap;
-    ArrayWrap currentLine;
+    ArrayWrapper renderWrap;
+    ArrayWrapper currentLine;
     bool trailingNewline;
     Message *msg;
 } RenderState;
@@ -33,25 +41,69 @@ typedef struct Nodes {
 } Nodes;
 
 bool isOk(Message *message);
+ArrayWrapper wrapArray(void *dataPtr, int *lenPtr, int size);
+void arrayAppendMulti(ArrayWrapper *array, int count, const void *elems, Message *message);
+void arrayAppend(ArrayWrapper *array, const void *elem, Message *message);
+void arrayShrink(ArrayWrapper *array, Message *message);
+HtmlRender renderHtml(const char *html, Message *message);
+
+// addLine adds line to render, also adding empty one above if
+// state::trailingNewline is true.
 void addLine(RenderState *state, char *line);
+
 bool hasTag(GumboNode *node, GumboTag tag);
-bool isTagInline(GumboTag tag);
-bool canSkipNode(GumboNode *node);
-char *trimWhitespace(const char *text, Message *message);
-bool isContextInline(GumboNode *node);
+bool isNodeInline(GumboNode *node);
 Nodes getNodeChildren(GumboNode *node);
-void renderNodesInline(Nodes nodes, ArrayWrap *lineWrap, RenderState *state);
-void renderNodesBlock(Nodes nodes, RenderState *state);
+GumboAttribute *getAttribute(GumboNode *node, const char *name);
+
+// shouldSkipNode returns whether the contents of the node should not be rendered,
+// e. g. style or script nodes.
+bool shouldSkipNode(GumboNode *node);
+
+// canBreakWord returns whether current position in string is suitable for
+// breaking to next line. Depends on BREAK_ON_CHARS.
+bool canBreakWord(const char *s, int length);
+
+// trimWhitespace converts all whitespace of the text to single spaces,
+// consecutive space to single spaces and trims both leading and trailing
+// whitespace. Returned string is newly allocated.
+char *trimWhitespace(const char *text, Message *message);
+
+// surroundNodes returns new node range, surrounding given nodes with prefix and
+// suffix and writing everything to given array. Prefix or suffix may be NULL,
+// in which case they are not added. array must be big enough to fill the old
+// node range, prefix and suffix (if not NULL).
+Nodes surroundNodes(GumboNode *prefix, GumboNode *suffix, Nodes nodes, GumboNode **array);
+
+// renderNodeSurrounded renders given children of given node with newly created
+// leading and trailing text nodes, containing the prefix and suffix
+// accordingly. Prefix or suffix may be NULL, in which case coresponding text
+// node(s) are not created.
+void renderNodeSurrounded(const char *prefix, const char *suffix, GumboNode *node, bool isInline, RenderState *state);
+
+// Rendering functions for specific html elements.
+
+void renderNodeP(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeA(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeImg(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeI(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeB(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeUl(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeOl(GumboNode *node, bool isInline, RenderState *state);
+void renderNodeHr(GumboNode *node, bool isInline, RenderState *state);
+
+// renderNodeHN renders headings (h1-h6) with the number specified as n.
+void renderNodeHN(GumboNode *node, int n, bool isInline, RenderState *state);
+
+void renderNode(GumboNode *node, bool isInline, RenderState *state);
 void renderNodes(Nodes nodes, bool isInline, RenderState *state);
-// void renderNodeInline(GumboNode *node, char **line, int *length, RenderState *state);
-// void renderNodeBlock(GumboNode *node, RenderState *state);
 
 bool isOk(Message *message) {
     return message->type != MSG_TYPE_ERROR;
 }
 
-ArrayWrap wrapArray(void *dataPtr, int *lenPtr, int size) {
-    ArrayWrap array = {
+ArrayWrapper wrapArray(void *dataPtr, int *lenPtr, int size) {
+    ArrayWrapper array = {
         .data = dataPtr,
         .len = lenPtr,
         .size = size,
@@ -60,9 +112,7 @@ ArrayWrap wrapArray(void *dataPtr, int *lenPtr, int size) {
     return array;
 }
 
-void arrayAppendMulti(ArrayWrap *array, int count, const void *elems, Message *message) {
-    if (*array->len)
-        printf("o");
+void arrayAppendMulti(ArrayWrapper *array, int count, const void *elems, Message *message) {
     if (array->cap < *array->len + count) {
         while (array->cap < *array->len + count) {
             array->cap = array->cap ? array->cap * 2 : 1;
@@ -77,11 +127,11 @@ void arrayAppendMulti(ArrayWrap *array, int count, const void *elems, Message *m
     }
 }
 
-void arrayAppend(ArrayWrap *array, const void *elem, Message *message) {
+void arrayAppend(ArrayWrapper *array, const void *elem, Message *message) {
     arrayAppendMulti(array, 1, elem, message);
 }
 
-void arrayShrink(ArrayWrap *array, Message *message) {
+void arrayShrink(ArrayWrapper *array, Message *message) {
     if (array->cap != *array->len) {
         *array->data = xrealloc(*array->data, *array->len * array->size, message);
         array->cap = *array->len;
@@ -100,7 +150,6 @@ HtmlRender renderHtml(const char *html, Message *message) {
             .trailingNewline = false,
             .renderWrap = wrapArray(&render.lines, &render.lineCount, sizeof(char *)),
         };
-        // renderNodesBlock(getNodeChildren(out->root), &state);
         renderNodes(getNodeChildren(out->root), false, &state);
     }
     gumbo_destroy_output(&opt, out);
@@ -124,16 +173,7 @@ bool hasTag(GumboNode *node, GumboTag tag) {
     return node->type == GUMBO_NODE_ELEMENT && node->v.element.tag == tag;
 }
 
-bool isTagInline(GumboTag tag) {
-    int count = sizeof(inlineTags) / sizeof(GumboTag);
-    for (int i = 0; i < count; ++i) {
-        if (inlineTags[i] == tag)
-            return true;
-    }
-    return false;
-}
-
-bool canSkipNode(GumboNode *node) {
+bool shouldSkipNode(GumboNode *node) {
     return hasTag(node, GUMBO_TAG_STYLE) || hasTag(node, GUMBO_TAG_SCRIPT);
 }
 
@@ -163,19 +203,15 @@ char *trimWhitespace(const char *text, Message *message) {
 }
 
 bool isNodeInline(GumboNode *node) {
-    return node->type != GUMBO_NODE_ELEMENT || isTagInline(node->v.element.tag);
-}
-
-bool isContextInline(GumboNode *node) {
-    if (node->type != GUMBO_NODE_ELEMENT || isTagInline(node->v.element.tag)) {
+    if (node->type != GUMBO_NODE_ELEMENT) {
         return true;
     }
-    bool isInline = true;
-    for (int i = 0; i < node->v.element.children.length && isInline; ++i) {
-        GumboNode *child = ((GumboNode **)node->v.element.children.data)[i];
-        isInline &= child->type != GUMBO_NODE_ELEMENT || isTagInline(child->v.element.tag);
+    int count = sizeof(inlineTags) / sizeof(GumboTag);
+    for (int i = 0; i < count; ++i) {
+        if (inlineTags[i] == node->v.element.tag)
+            return true;
     }
-    return isInline;
+    return false;
 }
 
 Nodes getNodeChildren(GumboNode *node) {
@@ -186,7 +222,7 @@ Nodes getNodeChildren(GumboNode *node) {
     };
 }
 
-Nodes wrapNodes(GumboNode *prefix, GumboNode *suffix, Nodes nodes, GumboNode **array) {
+Nodes surroundNodes(GumboNode *prefix, GumboNode *suffix, Nodes nodes, GumboNode **array) {
     int offset = prefix != NULL;
     if (offset) {
         array[0] = prefix;
@@ -199,11 +235,6 @@ Nodes wrapNodes(GumboNode *prefix, GumboNode *suffix, Nodes nodes, GumboNode **a
         .begin = array,
         .end = array + offset + (nodes.end - nodes.begin) + (suffix != NULL),
     };
-}
-
-void makeTextNode(GumboNode *node, const char *text) {
-    node->type = GUMBO_NODE_TEXT;
-    node->v.text.text = text;
 }
 
 GumboAttribute *getAttribute(GumboNode *node, const char *name) {
@@ -228,7 +259,10 @@ void renderNodeP(GumboNode *node, bool isInline, RenderState *state) {
 void renderNodeSurrounded(const char *prefix, const char *suffix, GumboNode *node, bool isInline, RenderState *state) {
     GumboNode *nodeArray[node->v.element.children.length + 2];
     Nodes nodes = getNodeChildren(node);
-    nodes = wrapNodes(&MAKE_TEXT_NODE(prefix), &MAKE_TEXT_NODE(suffix), nodes, nodeArray);
+    GumboNode left = {.type = GUMBO_NODE_TEXT, .v.text.text = prefix};
+    GumboNode right = {.type = GUMBO_NODE_TEXT, .v.text.text = suffix};
+
+    nodes = surroundNodes(prefix ? &left : NULL, suffix ? &right : NULL, nodes, nodeArray);
     renderNodes(nodes, isInline, state);
 }
 
@@ -245,27 +279,27 @@ void renderNodeImg(GumboNode *node, bool isInline, RenderState *state) {
     GumboAttribute *src = getAttribute(node, "src");
     const char *url = src ? src->value : "";
     if (strstr(url, ";base64,")) {
-        url = "Base64";
+        url = SRC_BASE64;
     }
     char suffix[strlen(url) + sizeof(ZERO_WIDTH_SPACE "[]") + 1];
     sprintf(suffix, ZERO_WIDTH_SPACE "[%s]", url);
 
-    renderNodeSurrounded("Image:", suffix, node, isInline, state);
+    renderNodeSurrounded(IMAGE_PREFIX, suffix, node, isInline, state);
 }
 
 void renderNodeI(GumboNode *node, bool isInline, RenderState *state) {
-    renderNodeSurrounded("/", "/", node, isInline, state);
+    renderNodeSurrounded(ITALICS_MARK, ITALICS_MARK, node, isInline, state);
 }
 
 void renderNodeB(GumboNode *node, bool isInline, RenderState *state) {
-    renderNodeSurrounded("*", "*", node, isInline, state);
+    renderNodeSurrounded(BOLD_MARK, BOLD_MARK, node, isInline, state);
 }
 
 void renderNodeUl(GumboNode *node, bool isInline, RenderState *state) {
     Nodes nodes = getNodeChildren(node);
     for (GumboNode **it = nodes.begin; it < nodes.end; ++it) {
         if (hasTag(*it, GUMBO_TAG_LI)) {
-            renderNodeSurrounded("\xE2\x80\xA2 ", "", *it, isInline, state);
+            renderNodeSurrounded(UNORDERED_LIST_PREFIX, NULL, *it, isInline, state);
         }
     }
 }
@@ -275,25 +309,25 @@ void renderNodeOl(GumboNode *node, bool isInline, RenderState *state) {
     int index = 1;
     for (GumboNode **it = nodes.begin; it < nodes.end; ++it) {
         if (hasTag(*it, GUMBO_TAG_LI)) {
-            char indent[15];
+            char indent[MAX_INT_WIDTH + 2];
             sprintf(indent, "%d. ", index);
-            renderNodeSurrounded(indent, "", *it, isInline, state);
+            renderNodeSurrounded(indent, NULL, *it, isInline, state);
             ++index;
         }
     }
 }
 
 void renderNodeHN(GumboNode *node, int n, bool isInline, RenderState *state) {
-    char title[MAX_H_N + 3] = " ";
+    char title[MAX_HEADING_N + 3] = " ";
     for (int i = 0; i < n; ++i) {
-        strcat(title, "#");
+        strcat(title, HEADING_MARK);
     }
     strcat(title, " ");
     renderNodeSurrounded(title, title, node, isInline, state);
 }
 
 void renderNodeHr(GumboNode *node, bool isInline, RenderState *state) {
-    renderNodeSurrounded("------", "", node, isInline, state);
+    renderNodeSurrounded(HR_LINE, NULL, node, isInline, state);
 }
 
 void renderNode(GumboNode *node, bool isInline, RenderState *state) {
@@ -360,7 +394,7 @@ void renderNode(GumboNode *node, bool isInline, RenderState *state) {
 void renderNodes(Nodes nodes, bool isInline, RenderState *state) {
     for (GumboNode **it = nodes.begin; it < nodes.end && isOk(state->msg); ++it) {
         GumboNode *node = *it;
-        if (canSkipNode(node)) {
+        if (shouldSkipNode(node)) {
             continue;
         }
         if (!isInline && isNodeInline(node)) {
@@ -385,64 +419,6 @@ void renderNodes(Nodes nodes, bool isInline, RenderState *state) {
     }
 }
 
-/*
-void renderNodesInline(Nodes nodes, ArrayWrap *lineWrap, RenderState *state) {
-    const char *suffix = state->suffix;
-    state->suffix = NULL;
-    // TODO: add inline node clustering
-    for (GumboNode **it = nodes.begin; it < nodes.end && isOk(state->msg); ++it) {
-        GumboNode *node = *it;
-        if (node->type == GUMBO_NODE_TEXT) {
-            if (*lineWrap->len) {
-                --(*lineWrap->len);
-            }
-            if (state->prefix) {
-                arrayAppendMulti(lineWrap, strlen(state->prefix), state->prefix, state->msg);
-                state->prefix = NULL;
-            }
-            arrayAppendMulti(lineWrap, strlen(node->v.text.text) + 1, node->v.text.text, state->msg);
-        }
-        if (node->type == GUMBO_NODE_ELEMENT) {
-            if (hasTag(node, GUMBO_TAG_A)) {
-                GumboAttribute *href = getAttribute(node, "href");
-                if (href) {
-                    // state->prefix = href->value;
-                }
-            }
-            renderNodesInline(getNodeChildren(node), lineWrap, state);
-        }
-    }
-}
-
-void renderNodesBlock(Nodes nodes, RenderState *state) {
-    const char *suffix = state->suffix;
-    state->suffix = NULL;
-    for (GumboNode **it = nodes.begin; it < nodes.end && isOk(state->msg); ++it) {
-        GumboNode *node = *it;
-        if (canSkipNode(node)) {
-            continue;
-        }
-        if (isContextInline(node)) {
-            state->trailingNewline |= hasTag(node, GUMBO_TAG_P);
-            char *line = NULL;
-            int ln = 0;
-            ArrayWrap lineWrap = wrapArray(&line, &ln, sizeof(char));
-            renderNodesInline((Nodes){.begin = it, .end = it + 1}, &lineWrap, state);
-            if (line) {
-                char *trimmed = trimWhitespace(line, state->msg);
-                free(line);
-                if (trimmed && *trimmed) {
-                    addLine(state, trimmed);
-                }
-            }
-            state->trailingNewline |= hasTag(node, GUMBO_TAG_P);
-        } else {
-            renderNodesBlock(getNodeChildren(node), state);
-        }
-    }
-}
-*/
-
 bool canBreakWord(const char *s, int length) {
     if (!length) {
         Rune ch;
@@ -458,7 +434,7 @@ WrappedLines wrapHtmlRender(HtmlRender render, int width, Message *message) {
     // This implementation relies on the html rendering algorithm, which leaves
     // only spaces as whitespace.
     WrappedLines result = {.count = 0, .lines = NULL};
-    ArrayWrap resultWrap = wrapArray(&result.lines, &result.count, sizeof(Line));
+    ArrayWrapper resultWrap = wrapArray(&result.lines, &result.count, sizeof(Line));
     if (width < 2) {
         return result;
     }
@@ -502,18 +478,3 @@ void freeHtmlRender(HtmlRender render) {
 void freeWrappedLines(WrappedLines lines) {
     free(lines.lines);
 }
-
-// int main() {
-//     char *html;
-//     scanf("%m[^#]", &html);
-//     Message message = {.msg = NULL, .type = MSG_TYPE_NONE};
-//     HtmlRender render = renderHtml(html, &message);
-//     WrappedLines lines = wrapHtmlRender(render, 45, &message);
-//     for (int i = 0; i < lines.count; ++i) {
-//         fwrite(lines.lines[i].text, 1, lines.lines[i].length, stdout);
-//         fputc('\n', stdout);
-//     }
-//     freeHtmlRender(render);
-//     freeWrappedLines(lines);
-//     free(html);
-// }
