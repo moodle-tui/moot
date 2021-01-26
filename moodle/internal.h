@@ -73,11 +73,11 @@ size_t write_memblock_callback(void *contents, size_t size, size_t nmemb, void *
 
 // http_get_request_to_file makes http get request to stream and writes data to
 // given stream.
-void http_get_request_to_file(char *url, FILE *stream, MDError *error);
+void http_get_request_to_file(cchar *url, FILE *stream, MDError *error);
 
 // http_get_request makes get request and returns received data, for which
 // caller is responsible to free.
-char *http_get_request(char *url, MDError *error);
+char *http_get_request(cchar *url, MDError *error);
 
 // http_get_multi_request makes multiple http requests at once. Each element of
 // the returned 2D array and the array itself needs to be freed by the caller.

@@ -1,3 +1,10 @@
+/*
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * Licensed as with https://github.com/moodle-tui/moot
+ *
+ * General tester of moodle library capabilities using moodle demo site.
+*/
+
 #include <curl/curl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +28,7 @@
 #define SAVE_FILE "file.bin"
 #define CREDENTIALS_LENGTH 100
 #define VU_SSO_PLUGIN "moodle/plugins/vu_sso.mtplug"
+#define VU_WEBSITE "emokymai.vu.lt"
 
 // Gets token from
 char *get_token(MDError *error) {
@@ -65,11 +73,26 @@ void test_vu_sso_auth(MDError *error) {
     fread_line(stdin, username, CREDENTIALS_LENGTH);
     printf("password: ");
     fread_line(stdin, password, CREDENTIALS_LENGTH);
+    printf("Loading plugin %s\n", VU_SSO_PLUGIN);
     md_auth_load_plugin(VU_SSO_PLUGIN, error);
     if (!*error) {
-        char *token = md_auth_login("emokymai.vu.lt", username, password, error);
+        printf("Trying to get token from %s\n", VU_WEBSITE);
+
+        char *token = md_auth_login(VU_WEBSITE, username, password, error);
         if (token) {
-            printf("Success! token: %s\n", token);
+            printf("Success! Token received\n");
+            printf("Logging in...\n");
+
+            MDClient *client = md_client_new(token, VU_WEBSITE, error);
+            if (client) {
+                md_client_init(client, error);
+                if (!*error) {
+                    printf("Success! Logged in as\n");
+                    printf("%s\n", client->fullName);
+                    printf("To: %s\n", client->siteName);
+                }
+            }
+            md_client_cleanup(client);
         }
         free(token);
     }

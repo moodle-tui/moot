@@ -1,3 +1,10 @@
+/*
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * Licensed as with https://github.com/moodle-tui/moot
+ *
+ * Part of moodle library (error handling functions). See moodle.h
+*/
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -29,14 +29,21 @@ static GumboTag inlineTags[] = {
 };
 
 typedef struct RenderState {
-    HtmlRender *render;
+    // renderWrap is a wrapper around HtmlRender to which lines are appended.
     ArrayWrapper renderWrap;
+
+    // currentLine is the current line of rendering. Only valid in inline
+    // context. currentLine.len is the string length including terminating zero.
     ArrayWrapper currentLine;
+
+    // trailingNewline is a flag which signals that an empty lines should be
+    // inserted before adding more text.
     bool trailingNewline;
     Message *msg;
 } RenderState;
 
 typedef struct Nodes {
+    // Range of GumboNode *, excluding end: [begin:end)
     GumboNode **begin, **end;
 } Nodes;
 
@@ -119,6 +126,7 @@ void arrayAppendMulti(ArrayWrapper *array, int count, const void *elems, Message
         }
         *array->data = xrealloc(*array->data, array->cap * array->size, message);
     }
+
     if (*(array->data)) {
         memcpy((char *)*array->data + *array->len * array->size, elems, array->size * count);
         *array->len += count;
@@ -140,30 +148,34 @@ void arrayShrink(ArrayWrapper *array, Message *message) {
 
 HtmlRender renderHtml(const char *html, Message *message) {
     HtmlRender render = {.lineCount = 0, .lines = NULL};
-    GumboOptions opt = kGumboDefaultOptions;
-    opt.fragment_context = GUMBO_TAG_HTML;
-    GumboOutput *out = gumbo_parse_with_options(&opt, html, strlen(html));
+
+    GumboOptions options = kGumboDefaultOptions;
+    options.fragment_context = GUMBO_TAG_HTML;
+
+    GumboOutput *out = gumbo_parse_with_options(&options, html, strlen(html));
     if (out) {
         RenderState state = {
-            .render = &render,
             .msg = message,
             .trailingNewline = false,
             .renderWrap = wrapArray(&render.lines, &render.lineCount, sizeof(char *)),
         };
         renderNodes(getNodeChildren(out->root), false, &state);
     }
-    gumbo_destroy_output(&opt, out);
+
+    gumbo_destroy_output(&options, out);
+
     return render;
 }
 
 void addLine(RenderState *state, char *line) {
-    if (state->render->lineCount && state->trailingNewline) {
+    if (*(state->renderWrap.len) && state->trailingNewline) {
         char *empty = xcalloc(1, 1, state->msg);
         if (isOk(state->msg)) {
             arrayAppend(&state->renderWrap, &empty, state->msg);
             state->trailingNewline = false;
         }
     }
+
     if (isOk(state->msg)) {
         arrayAppend(&state->renderWrap, &line, state->msg);
     }
@@ -181,8 +193,10 @@ char *trimWhitespace(const char *text, Message *message) {
     char *buffer = xcalloc(strlen(text) + 1, 1, message);
     if (isOk(message)) {
         int bufferLength = 0;
+
         // Trim leading whitespace.
         bool ignoreWhitespace = true;
+
         while (*text) {
             // Convert inner whitespace to single spaces.
             if (isspace(*text) && !ignoreWhitespace) {
@@ -194,11 +208,13 @@ char *trimWhitespace(const char *text, Message *message) {
             }
             ++text;
         }
+
         // Trim trailing whitespace.
         for (int i = bufferLength - 1; i >= 0 && isspace(buffer[i]); --i) {
             buffer[i] = 0;
         }
     }
+
     return xrealloc(buffer, strlen(buffer) + 1, message);
 }
 
@@ -206,16 +222,17 @@ bool isNodeInline(GumboNode *node) {
     if (node->type != GUMBO_NODE_ELEMENT) {
         return true;
     }
+
     int count = sizeof(inlineTags) / sizeof(GumboTag);
     for (int i = 0; i < count; ++i) {
         if (inlineTags[i] == node->v.element.tag)
             return true;
     }
+
     return false;
 }
 
 Nodes getNodeChildren(GumboNode *node) {
-    assert(node->type == GUMBO_NODE_ELEMENT);
     return (Nodes){
         .begin = (GumboNode **)node->v.element.children.data,
         .end = (GumboNode **)node->v.element.children.data + node->v.element.children.length,
@@ -227,10 +244,13 @@ Nodes surroundNodes(GumboNode *prefix, GumboNode *suffix, Nodes nodes, GumboNode
     if (offset) {
         array[0] = prefix;
     }
+
     memcpy(array + offset, nodes.begin, (nodes.end - nodes.begin) * sizeof(GumboNode *));
+
     if (suffix) {
         array[offset + nodes.end - nodes.begin] = suffix;
     }
+
     return (Nodes){
         .begin = array,
         .end = array + offset + (nodes.end - nodes.begin) + (suffix != NULL),
@@ -247,15 +267,6 @@ GumboAttribute *getAttribute(GumboNode *node, const char *name) {
     return NULL;
 }
 
-void renderNodeP(GumboNode *node, bool isInline, RenderState *state) {
-    state->trailingNewline = true;
-    renderNodes(getNodeChildren(node), isInline, state);
-    state->trailingNewline = true;
-}
-
-// #define SURROUND_NODES(prefix, suffix, nodes)
-#define MAKE_TEXT_NODE(str) ((GumboNode){.type = GUMBO_NODE_TEXT, .v.text.text = str})
-
 void renderNodeSurrounded(const char *prefix, const char *suffix, GumboNode *node, bool isInline, RenderState *state) {
     GumboNode *nodeArray[node->v.element.children.length + 2];
     Nodes nodes = getNodeChildren(node);
@@ -266,9 +277,16 @@ void renderNodeSurrounded(const char *prefix, const char *suffix, GumboNode *nod
     renderNodes(nodes, isInline, state);
 }
 
+void renderNodeP(GumboNode *node, bool isInline, RenderState *state) {
+    state->trailingNewline = true;
+    renderNodes(getNodeChildren(node), isInline, state);
+    state->trailingNewline = true;
+}
+
 void renderNodeA(GumboNode *node, bool isInline, RenderState *state) {
     GumboAttribute *href = getAttribute(node, "href");
     const char *url = href ? href->value : "";
+
     char suffix[strlen(url) + sizeof(">" ZERO_WIDTH_SPACE "[]") + 1];
     sprintf(suffix, ">" ZERO_WIDTH_SPACE "[%s]", url);
 
@@ -281,6 +299,7 @@ void renderNodeImg(GumboNode *node, bool isInline, RenderState *state) {
     if (strstr(url, ";base64,")) {
         url = SRC_BASE64;
     }
+
     char suffix[strlen(url) + sizeof(ZERO_WIDTH_SPACE "[]") + 1];
     sprintf(suffix, ZERO_WIDTH_SPACE "[%s]", url);
 
@@ -297,33 +316,47 @@ void renderNodeB(GumboNode *node, bool isInline, RenderState *state) {
 
 void renderNodeUl(GumboNode *node, bool isInline, RenderState *state) {
     Nodes nodes = getNodeChildren(node);
+    state->trailingNewline = true;
+
     for (GumboNode **it = nodes.begin; it < nodes.end; ++it) {
         if (hasTag(*it, GUMBO_TAG_LI)) {
             renderNodeSurrounded(UNORDERED_LIST_PREFIX, NULL, *it, isInline, state);
         }
     }
+
+    state->trailingNewline = true;
 }
 
 void renderNodeOl(GumboNode *node, bool isInline, RenderState *state) {
     Nodes nodes = getNodeChildren(node);
     int index = 1;
+    state->trailingNewline = true;
+
     for (GumboNode **it = nodes.begin; it < nodes.end; ++it) {
         if (hasTag(*it, GUMBO_TAG_LI)) {
             char indent[MAX_INT_WIDTH + 2];
             sprintf(indent, "%d. ", index);
+
             renderNodeSurrounded(indent, NULL, *it, isInline, state);
+
             ++index;
         }
     }
+
+    state->trailingNewline = true;
 }
 
 void renderNodeHN(GumboNode *node, int n, bool isInline, RenderState *state) {
     char title[MAX_HEADING_N + 3] = " ";
+
     for (int i = 0; i < n; ++i) {
         strcat(title, HEADING_MARK);
     }
     strcat(title, " ");
+
+    state->trailingNewline = true;
     renderNodeSurrounded(title, title, node, isInline, state);
+    state->trailingNewline = true;
 }
 
 void renderNodeHr(GumboNode *node, bool isInline, RenderState *state) {
@@ -382,6 +415,7 @@ void renderNode(GumboNode *node, bool isInline, RenderState *state) {
                 break;
         }
     }
+
     if (node->type == GUMBO_NODE_TEXT) {
         // Remove the zero terminator.
         if (*state->currentLine.len) {
@@ -397,11 +431,13 @@ void renderNodes(Nodes nodes, bool isInline, RenderState *state) {
         if (shouldSkipNode(node)) {
             continue;
         }
+
         if (!isInline && isNodeInline(node)) {
             GumboNode **end = it + 1;
             while (end < nodes.end && isNodeInline(*end)) {
                 ++end;
             }
+
             char *line = NULL;
             state->currentLine = wrapArray(&line, &(int){0}, sizeof(char));
             renderNodes((Nodes){.begin = it, .end = end}, true, state);
@@ -412,6 +448,7 @@ void renderNodes(Nodes nodes, bool isInline, RenderState *state) {
                     addLine(state, trimmed);
                 }
             }
+
             it = end - 1;
         } else {
             renderNode(node, isInline, state);
@@ -424,9 +461,11 @@ bool canBreakWord(const char *s, int length) {
         Rune ch;
         length = utf8decodeNullTerm(s, &ch);
     }
+
     char c[length + 1];
     strncpy(c, s, length);
     c[length] = 0;
+
     return length && strstr(BREAK_ON_CHARS, c) != NULL;
 }
 
@@ -438,6 +477,7 @@ WrappedLines wrapHtmlRender(HtmlRender render, int width, Message *message) {
     if (width < 2) {
         return result;
     }
+
     for (int i = 0; i < render.lineCount && isOk(message); ++i) {
         const char *it = render.lines[i];
         do {
@@ -445,6 +485,7 @@ WrappedLines wrapHtmlRender(HtmlRender render, int width, Message *message) {
             if (*it == ' ') {
                 ++it;
             }
+
             const char *begin = it, *lastBreakPos = NULL;
             int sliceWidth = 0;
             while (sliceWidth < width && *it) {
@@ -456,14 +497,18 @@ WrappedLines wrapHtmlRender(HtmlRender render, int width, Message *message) {
                 it += chLength;
                 sliceWidth += wcwidth(ch);
             }
+
             const char *end = it;
             if (sliceWidth >= width && lastBreakPos && !canBreakWord(it, 0)) {
                 end = lastBreakPos + utf8decodeNullTerm(lastBreakPos, &(Rune){0});
             }
+
             arrayAppend(&resultWrap, &(Line){.text = begin, .length = end - begin}, message);
+
             it = end;
         } while (*it && isOk(message));
     }
+
     arrayShrink(&resultWrap, message);
     return result;
 }
@@ -472,6 +517,7 @@ void freeHtmlRender(HtmlRender render) {
     for (unsigned int i = 0; i < render.lineCount; ++i) {
         free(render.lines[i]);
     }
+
     free(render.lines);
 }
 

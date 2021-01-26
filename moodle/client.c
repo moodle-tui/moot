@@ -1,3 +1,10 @@
+/*
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * Licensed as with https://github.com/moodle-tui/moot
+ *
+ * Part of moodle library, general api implementation. See moodle.h
+*/
+
 #include <curl/curl.h>
 #include <stdarg.h>
 #include <stdbool.h>

@@ -1,3 +1,10 @@
+/*
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * Licensed as with https://github.com/moodle-tui/moot
+ *
+ * Part of moodle library (Utility functions). See moodle.h
+*/
+
 #include <curl/curl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -100,7 +107,7 @@ size_t write_stream_callback(void *contents, size_t size, size_t nmemb, void *st
     return fwrite(contents, size, nmemb, (FILE *)stream);
 }
 
-void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
+void http_get_request_to_file(cchar *url, FILE *stream, MDError *error) {
     CURL *handle = create_curl(url, (void *)stream, write_stream_callback, error);
     if (!handle)
         return;
@@ -114,7 +121,7 @@ void http_get_request_to_file(char *url, FILE *stream, MDError *error) {
     curl_easy_cleanup(handle);
 }
 
-char *http_get_request(char *url, MDError *error) {
+char *http_get_request(cchar *url, MDError *error) {
     ENSURE_EMPTY_ERROR(error);
     CURL *handle;
     CURLcode res;

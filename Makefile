@@ -1,6 +1,5 @@
 include config.mk
 
-LDLIBS = -lcurl -lm -ldl
 INCLUDE_LIB = -Ilib/
 INCLUDE_MOODLE = -Imoodle/
 
@@ -36,7 +35,7 @@ $(MOODLE)/%.o: $(MOODLE)/%.c
 	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) -o $@
 
 $(APP)/%.o: $(APP)/%.c
-	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) -o $@
+	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) -o $@
 
 $(LIB): $(LIB_OBJ)
 
@@ -47,31 +46,26 @@ $(APP): $(LIB) $(APP_OBJ) $(GUMBO_OBJ)
 moot: $(APP_OBJ) $(MOODLE_OBJ) $(LIB_OBJ) $(GUMBO_OBJ)
 	$(CC) $(CCFLAGS) $^ $(LDLIBS) $(LIBS) -o $(TARGET)
 
-
-HTML = app/html_renderer
-html_renderer: $(GUMBO_OBJ) $(LIB)/utf8.o $(LIB)/wcwidth.o $(APP)/util.o $(APP)/message.o $(APP)/ui.o $(LIB)/rlutil.o
-	$(CC) $(CCFLAGS) $(HTML).c $^ $(INCLUDE_LIB) $(LDLIBS) -o $(HTML)
-
 TEST = moodle/test/test
 test: $(MOODLE_OBJ) $(LIB_OBJ) vu_sso_plugin
-	$(CC) $(CCFLAGS) $(TEST).c $(MOODLE_OBJ) $(LIB_OBJ) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(TEST)
+	$(CC) $(CCFLAGS) $(TEST).c $(MOODLE_OBJ) $(LIB_OBJ) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) $(INCLUDES) -o $(TEST)$(EXEC_EXT)
 
 JSON_TEST = lib/tests/json
 json_test: $(LIB)/json.o $(LIB)/utf8.o
-	$(CC) $(CCFLAGS) $(JSON_TEST).c $^ $(INCLUDE_LIB) $(LDLIBS) $(LIBS) -o $(JSON_TEST)
+	$(CC) $(CCFLAGS) $(JSON_TEST).c $^ $(INCLUDE_LIB) $(LIBS) $(INCLUDES) -o $(JSON_TEST)$(EXEC_EXT)
 
 VU_SSO = $(PLUGINS)/vu_sso
 vu_sso_plugin: $(LIB)/base64.o
-	$(CC) $(CCFLAGS) -shared $(VU_SSO).c $^ $(INCLUDE_LIB) $(INCLUDE_MOODLE) $(LDLIBS) $(LIBS) -o $(VU_SSO).$(PLUGIN_EXT)
+	$(CC) $(CCFLAGS) -shared $(VU_SSO).c $^ $(INCLUDE_LIB) $(INCLUDE_MOODLE) $(LDLIBS) $(LIBS) $(INCLUDES) -o $(VU_SSO).$(PLUGIN_EXT)
 
 clean:
-	$(RM) $(LIB_OBJ)
-	$(RM) $(GUMBO_OBJ)
-	$(RM) $(MOODLE_OBJ)
-	$(RM) $(APP_OBJ)
-	$(RM) $(TARGET)
-	$(RM) $(TEST)
-	$(RM) $(VU_SSO).$(PLUGIN_EXT)
-	$(RM) $(JSON_TEST)
+	$(RM) $(subst /,$(SEP),$(LIB_OBJ))
+	$(RM) $(subst /,$(SEP),$(GUMBO_OBJ))
+	$(RM) $(subst /,$(SEP),$(MOODLE_OBJ))
+	$(RM) $(subst /,$(SEP),$(APP_OBJ))
+	$(RM) $(subst /,$(SEP),$(TARGET))
+	$(RM) $(subst /,$(SEP),$(TEST)$(EXEC_EXT))
+	$(RM) $(subst /,$(SEP),$(VU_SSO).$(PLUGIN_EXT))
+	$(RM) $(subst /,$(SEP),$(JSON_TEST)$(EXEC_EXT))
 
-.PHONY: all $(LIB) $(MOODLE) moot clean test vu_sso_plugin
+.PHONY: all $(LIB) $(MOODLE) $(APP) moot clean test vu_sso_plugin

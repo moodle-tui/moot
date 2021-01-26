@@ -2,7 +2,7 @@
  * Nojus Gudinavičius nojus.gudinavicius@gmail.com
  * Licensed as with https://github.com/moodle-tui/moot
  *
- * A wrapper library for dynamic shared library loading using POSIX
+ * A super simple wrapper library for dynamic shared library loading using POSIX
  * and Win32 api.
  */
 

@@ -1,3 +1,15 @@
+/*
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * Licensed as with https://github.com/moodle-tui/moot
+ *
+ * Part of moodle library. See moodle.h
+ *
+ * For the users of library convenience, it was decided to add customisible
+ * fields to every exposed struct of moodle library. The name of the fields needs
+ * to be defined at compile time (e. g. -DMD_CUSTOM_FIELD_ARRAY=data) and it
+ * will have type of void *. No fields are added by default.
+*/
+
 #ifndef __DEFINES_H
 #define __DEFINES_H
 
