@@ -1,3 +1,8 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

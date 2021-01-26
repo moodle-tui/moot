@@ -1,3 +1,8 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #define _XOPEN_SOURCE
 #include <stdlib.h>
 #include <stdio.h>

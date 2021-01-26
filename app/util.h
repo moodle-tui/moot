@@ -1,3 +1,9 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #ifndef __UTIL_H
 #define __UTIL_H
 #include "message.h"

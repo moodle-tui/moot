@@ -1,3 +1,8 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #ifndef __CFG_LOCAL_H
 #define __CFG_LOCAL_H
 

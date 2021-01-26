@@ -1,3 +1,8 @@
+/*
+ * Ramojus Lapinskas
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #include <stdio.h>
 #include <errno.h>
 #include "rlutil.h"

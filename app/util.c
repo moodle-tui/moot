@@ -1,3 +1,9 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * Nojus Gudinavičius nojus.gudinavicius@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+
 #include <stdlib.h>
 #include <math.h>
 #include "app.h"

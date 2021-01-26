@@ -1,3 +1,8 @@
+/*
+ * Ramojus Lapinskas ramojus.lap@gmail.com
+ * licensed as with https://github.com/moodle-tui/moot
+ */
+ 
 #ifndef __APP_H
 #define __APP_H
 
