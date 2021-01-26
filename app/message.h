@@ -54,6 +54,5 @@ typedef struct Message {
 } Message;
 
 void createMsg(Message *msg, cchar *content, cchar *details, MsgType type);
-void msgInit(Message *msg);
 
 #endif // __MESSAGE_H

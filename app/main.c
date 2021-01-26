@@ -9,7 +9,6 @@
 #include "config.h"
 
 int main() {
-    MDError mdError = MD_ERR_NONE;
     ConfigValues configValues;
     Message msg, prevMsg;
     msgInit(&msg);
@@ -26,9 +25,8 @@ int main() {
     }
     MDArray courses;
     MDClient *client = NULL;
-    initialize(&client, &courses, &configValues, &mdError);
-    if (mdError) {
-        createMsg(&msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
+    initialize(&client, &courses, &configValues, &msg);
+    if (msg.type == MSG_TYPE_ERROR) {
         printMsgNoUI(msg);
         terminate(client, courses, &msg, &prevMsg);
         return 0;
@@ -44,17 +42,19 @@ int main() {
     return 0;
 }
 
-void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, MDError *mdError) {
+void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, Message *msg) {
+    MDError mdError = MD_ERR_NONE;
     md_init();
-    *client = md_client_new(configValues->token, "https://emokymai.vu.lt", mdError);
-    if (*mdError)
+    *client = md_client_new(configValues->token, "https://emokymai.vu.lt", &mdError);
+    if (!mdError)
+        md_client_init(*client, &mdError);
+    if (!mdError)
+        *courses = md_client_fetch_courses(*client, 0, &mdError);
+    if (mdError) {
+        createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
         return;
-
-    md_client_init(*client, mdError);
-    if (*mdError)
-        return;
-
-    *courses = md_client_fetch_courses(*client, 0, mdError);
+    }
+    setHtmlRenders(courses, msg);
 }
 
 void terminate(MDClient *client, MDArray courses, Message *msg, Message *prevMsg) {

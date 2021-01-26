@@ -73,6 +73,8 @@ int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
     MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
     MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
     int height;
+    bool isResource = (modules.len > 0
+            && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE);
     switch (depth) {
         case COURSES_DEPTH:
             height = courses.len;
@@ -83,10 +85,11 @@ int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
         case MODULES_DEPTH:
             height = modules.len;
             break;
-        case MODULE_CONTENTS_DEPTH1:
-            height = 1;
-        case MODULE_CONTENTS_DEPTH2:
-            if (modules.len > 0 && MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].type == MD_MOD_RESOURCE)
+        case MODULE_DEPTH1:
+            height = 1 + isResource;
+            break;
+        case MODULE_DEPTH2:
+            if (isResource)
                 height = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]].contents.resource.files.len;
             else
                 height = -1;
@@ -99,7 +102,7 @@ int getDepthHeight(int depth, MDArray courses, int *highlightedOptions) {
 
 void doAction(Action action, MDArray courses, MDClient *client, int *highlightedOptions,
         int *depth, int *scrollOffsets, char *uploadCommand, Message *msg) {
-    int depthHeight = getDepthHeight(*depth, courses, highlightedOptions) - 1;
+    int depthHeight = getDepthHeight(*depth, courses, highlightedOptions);
     MDArray topics = MD_COURSES(courses)[highlightedOptions[COURSES_DEPTH]].topics;
     MDArray modules = MD_TOPICS(topics)[highlightedOptions[TOPICS_DEPTH]].modules;
     int maxHeight = trows() - 2;
@@ -138,12 +141,12 @@ void goRight(int *depth) {
 }
 
 void goDown(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
-    if (*highlightedOption + *scrollOffset == depthHeight) {
+    if (*highlightedOption + *scrollOffset == depthHeight - 1) {
         *highlightedOption = 0;
         *scrollOffset = 0;
     }
     else {
-        if (*highlightedOption >= maxHeight - SCROLLOFF && depthHeight - *scrollOffset > maxHeight)
+        if (*highlightedOption >= maxHeight - SCROLLOFF && depthHeight - *scrollOffset - 1 > maxHeight)
             ++*scrollOffset;
         else
             ++*highlightedOption;
@@ -156,12 +159,12 @@ void goLeft(int *depth, int *highlightedOptions) {
 
 void goUp(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOffset) {
     if (*highlightedOption + *scrollOffset == 0) {
-        if (depthHeight > maxHeight) {
-            *scrollOffset = depthHeight - maxHeight;
+        if (depthHeight - 1 > maxHeight) {
+            *scrollOffset = depthHeight - maxHeight - 1;
             *highlightedOption = maxHeight;
         }
         else
-            *highlightedOption = depthHeight;
+            *highlightedOption = depthHeight - 1;
     }
     else {
         if (*scrollOffset != 0 && *highlightedOption <= SCROLLOFF)
@@ -171,9 +174,9 @@ void goUp(int *highlightedOption, int depthHeight, int maxHeight, int *scrollOff
     }
 }
 
-void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets) {
+void resetNextDepth(int *highlightedOption, int depth, int *scrollOffsets) {
     if (depth < LAST_DEPTH - 1) {
-        highlightedOptions[depth + 1] = 0;
+        highlightedOption[depth + 1] = 0;
         scrollOffsets[depth + 1] = 0;
     }
 }
@@ -200,7 +203,7 @@ void downloadFile(MDClient *client, MDArray modules, int *highlightedOptions, in
 }
 
 void getMDFile(MDFile *mdFile, MDArray modules, int *highlightedOptions, int depth, Message *msg) {
-    if (depth == MODULE_CONTENTS_DEPTH2) {
+    if (depth == MODULE_DEPTH2) {
         MDModule module = MD_MODULES(modules)[highlightedOptions[MODULES_DEPTH]];
         if (module.type == MD_MOD_RESOURCE) {
             MDModResource resource;
@@ -217,7 +220,7 @@ void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedO
     if (checkIfAbort(*msg))
         return;
     MDModule module = MD_MODULES(modules)[highlightedOptions[depth]];
-    if (!uploadCommand || !uploadCommand[0]) {
+    if (!uploadCommand[0]) {
         uploadCommand = DEFAULT_UPLOAD_COMMAND;
     }
 
@@ -227,7 +230,7 @@ void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedO
     if (checkIfAbort(*msg))
         return;
     if (fileNames.len == 0) {
-        createMsg(msg, MSG_NO_FILE_CHOSEN, NULL, MSG_TYPE_WARNING);
+        createMsg(msg, MSG_NO_FILE_CHOSEN, NULL, MSG_TYPE_BAD_ACTION);
         return;
     }
 

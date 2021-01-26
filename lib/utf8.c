@@ -45,9 +45,9 @@
 
 typedef uint_least32_t Rune;
 
-static Rune utf8decodebyte(char, size_t*);
-static size_t utf8validate(Rune*, size_t);
-static char utf8encodebyte(Rune, size_t);
+Rune utf8decodebyte(char, size_t*);
+size_t utf8validate(Rune*, size_t);
+char utf8encodebyte(Rune, size_t);
 
 /* Arbitrary sizes */
 #define UTF_INVALID 0xFFFD

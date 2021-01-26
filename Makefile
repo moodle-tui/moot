@@ -15,6 +15,7 @@ MOODLE = moodle
 MOODLE_REQ = $(LIB)/json.o $(LIB)/dlib.o
 MOODLE_SRC = $(wildcard $(MOODLE)/*.c)
 MOODLE_OBJ = $(MOODLE_SRC:%.c=%.o)
+CUSTOM_DEFINES = -DMD_CUSTOM_FIELD_RICH_TEXT=html_render
 
 APP = app
 APP_SRC = $(wildcard $(APP)/*.c)
@@ -32,10 +33,10 @@ $(GUMBO)/%.o: $(GUMBO)/%.c
 	$(CC) $(CCFLAGS) -c $< -o $@
 
 $(MOODLE)/%.o: $(MOODLE)/%.c
-	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) -o $@
+	$(CC) $(CCFLAGS) -c $< $(INCLUDE_LIB) $(INCLUDES) $(CUSTOM_DEFINES) -o $@
 
 $(APP)/%.o: $(APP)/%.c
-	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) -o $@
+	$(CC) $(CCFLAGS) -c $< $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(CUSTOM_DEFINES) -o $@
 
 $(LIB): $(LIB_OBJ)
 
@@ -48,7 +49,7 @@ moot: $(APP_OBJ) $(MOODLE_OBJ) $(LIB_OBJ) $(GUMBO_OBJ)
 
 TEST = moodle/test/test
 test: $(MOODLE_OBJ) $(LIB_OBJ) vu_sso_plugin
-	$(CC) $(CCFLAGS) $(TEST).c $(MOODLE_OBJ) $(LIB_OBJ) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) $(INCLUDES) -o $(TEST)$(EXEC_EXT)
+	$(CC) $(CCFLAGS) $(TEST).c $(MOODLE_OBJ) $(LIB_OBJ) $(INCLUDE_MOODLE) $(INCLUDE_LIB) $(LDLIBS) $(LIBS) $(INCLUDES) $(APP_DEFINES) -o $(TEST)$(EXEC_EXT)
 
 JSON_TEST = lib/tests/json
 json_test: $(LIB)/json.o $(LIB)/utf8.o
