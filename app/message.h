@@ -62,3 +62,4 @@ typedef struct Message {
 void createMsg(Message *msg, cchar *content, cchar *details, MsgType type);
 
 #endif // __MESSAGE_H
+

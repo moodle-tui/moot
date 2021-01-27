@@ -114,7 +114,7 @@ void sreadValue(ConfigValues *configValues, Property property, char *line, int *
             if (!configValues->site[0])
                 createMsg(msg, MSG_NO_SITE, NULL, MSG_TYPE_ERROR);
             break;
-        case PROPERTY_TOKEN:
+        case PROPERTY_FILE_SELECTION_COMMAND:
             configValues->token = sreadUntil(line, '\n', LINE_LIMIT, readPos, 1);
             if (!configValues->token[0])
                 createMsg(msg, MSG_NO_TOKEN, NULL, MSG_TYPE_ERROR);
@@ -139,5 +139,4 @@ char *sreadUntil(char *line, char mark, int limit, int *readPos, bool ignoreBlan
     }
     return NULL;
 }
-
 

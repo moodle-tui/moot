@@ -38,6 +38,10 @@ int getNrOfDigits(int number) {
     return snprintf(NULL, 0, "%d", number);
 }
 
+void printSpaces(int count) {
+    printf("%*s", count, "");
+}
+
 void setHtmlRenders(MDArray *courses, Message *msg) {
     for (int coursesIndex = 0; coursesIndex < courses->len; ++coursesIndex) {
         MDArray topics = MD_COURSES(*courses)[coursesIndex].topics;
@@ -74,5 +78,4 @@ void setHtmlRender(MDRichText *description, Message *msg) {
         return;
     description->html_render = render;
 }
-
 

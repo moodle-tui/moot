@@ -8,6 +8,8 @@
 #include "rlutil.h"
 #include "app.h"
 
+void readLine(char *line, Message *msg);
+
 char *getInput(char *inputMsg, Message *msg) {
     locate (0, trows());
     printSpaces(tcols());

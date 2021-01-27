@@ -55,8 +55,6 @@ void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues,
     if (!mdError)
         md_client_init(*client, &mdError);
     if (!mdError)
-        md_cleanup_json(md_client_do_http_json_request(*client, &mdError, "core_user_agree_site_policy", ""));
-    if (!mdError)
         *courses = md_client_fetch_courses(*client, 0, &mdError);
     if (mdError) {
         createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);
@@ -72,3 +70,4 @@ void terminate(MDClient *client, MDArray courses, Message *msg, Message *prevMsg
     md_client_cleanup(client);
     md_cleanup();
 }
+

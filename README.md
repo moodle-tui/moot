@@ -41,7 +41,7 @@ personal token:
    `<first_part>:::<second_part>`, with the `<second_part>` being the token you
    actually need.
    
-Token should to be specified in config file. See [Configuration](https://github.com/moodle-tui/moot#configuration)
+Token and moodle site should be specified in config file. See [Configuration](https://github.com/moodle-tui/moot#configuration)
 
 ### Interface
 To use the app simply run the executable. 
@@ -54,6 +54,7 @@ These are commands, that moot interface currently supports.
 - To quit, press `q`.
 - To download a file, hover it and press `s`.
 - To upload files, hover desired module and press `u`. (Only assignments currently supported)
+- To dismiss the message (int bottom left), press `escape`
 
 ### Configuration
 App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.
@@ -61,6 +62,8 @@ App can be configured through config file, that should be located at `$XDG_CONFI
 Format: `<property> = <value>`
 
 Currently supported properties:
+- `site` (required).
+    Should be equal to your moodle site.
 - `token` (required).
     Should be equal to your personal moodle token.
 - `upload_command`.

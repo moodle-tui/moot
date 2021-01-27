@@ -14,6 +14,26 @@
 #include "app.h"
 #include "moodle.h"
 
+#define UPLOAD_FILE_LENGTH 2048
+#define DEFAULT_FILE_SELECTION_COMMAND "tempFile=`mktemp` && lf -selection-path $tempFile && cat $tempFile && rm $tempFile"
+
+int getDepthHeight(int depth, MDArray courses, int *highlightedOptions);
+void goRight(int *depth);
+void goDown(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
+void goLeft(int *depth);
+void goUp(int *highlightedOption, int nrOfOptions, int terminalHeight, int *scrollOffset);
+void resetNextDepth(int *highlightedOptions, int depth, int *scrollOffsets);
+void downloadFile(MDClient *client, MDArray modules, int *highlightedOptions, int depth, Message *msg);
+void getMDFile(MDFile *mdFile, MDArray modules, int *highlightedOptions, int depth, Message *msg);
+void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg);
+void checkIfAssignmentOrWorkshop(MDArray modules, int *highlightedOptions, int depth, Message *msg);
+void getFileNames(MDArray *fileNames, char *uploadCommand, Message *msg);
+FILE *openFileSelectionProcess(char *uploadCommand, Message *msg);
+void readFileNames(FILE *uploadPathsPipe, MDArray *fileNames, Message *msg);
+void removeNewline(char *string);
+void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *msg);
+void setUploadSuccessMsg(int nrOfFilesUploaded, Message *msg);
+
 Action getAction(int key) {
     Action action;
     switch (key) {
@@ -121,7 +141,7 @@ void doAction(Action action, MDArray courses, MDClient *client, int *highlighted
             break;
         case ACTION_GO_LEFT:
             resetNextDepth(highlightedOptions, *depth, scrollOffsets);
-            goLeft(depth, highlightedOptions);
+            goLeft(depth);
             break;
         case ACTION_GO_UP:
             goUp(&highlightedOptions[*depth], depthHeight, maxHeight, &scrollOffsets[*depth]);
@@ -158,7 +178,7 @@ void goDown(int *highlightedOption, int depthHeight, int maxHeight, int *scrollO
     }
 }
 
-void goLeft(int *depth, int *highlightedOptions) {
+void goLeft(int *depth) {
     --*depth;
 }
 
@@ -220,17 +240,17 @@ void getMDFile(MDFile *mdFile, MDArray modules, int *highlightedOptions, int dep
     createMsg(msg, MSG_NOT_FILE, NULL, MSG_TYPE_BAD_ACTION);
 }
 
-void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *uploadCommand, Message *msg) {
+void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedOptions, char *fileSelectionCommand, Message *msg) {
     checkIfAssignmentOrWorkshop(modules, highlightedOptions, depth, msg);
     if (checkIfAbort(*msg))
         return;
     MDModule module = MD_MODULES(modules)[highlightedOptions[depth]];
-    if (!uploadCommand[0]) {
-        uploadCommand = DEFAULT_UPLOAD_COMMAND;
+    if (!fileSelectionCommand[0]) {
+        fileSelectionCommand = DEFAULT_FILE_SELECTION_COMMAND;
     }
 
     MDArray fileNames = MD_ARRAY_INITIALIZER;
-    getFileNames(&fileNames, uploadCommand, msg);
+    getFileNames(&fileNames, fileSelectionCommand, msg);
     hidecursor();
     if (checkIfAbort(*msg))
         return;
@@ -242,7 +262,7 @@ void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedO
     startUpload(client, module, fileNames, msg);
     if (checkIfAbort(*msg))
         return;
-    //setUploadSuccessMsg(fileNames.len, msg);
+    setUploadSuccessMsg(fileNames.len, msg);
     md_array_free(&fileNames);
 }
 
@@ -257,17 +277,17 @@ void checkIfAssignmentOrWorkshop(MDArray modules, int *highlightedOptions, int d
     }
 }
 
-void getFileNames(MDArray *fileNames, char *uploadCommand, Message *msg) {
-    FILE *uploadPathsPipe = openFileSelectionProcess(uploadCommand, msg);
+void getFileNames(MDArray *fileNames, char *fileSelectionCommand, Message *msg) {
+    FILE *uploadPathsPipe = openFileSelectionProcess(fileSelectionCommand, msg);
     if (checkIfAbort(*msg))
         return;
     readFileNames(uploadPathsPipe, fileNames, msg);
     pclose(uploadPathsPipe);
 }
 
-FILE *openFileSelectionProcess(char *uploadCommand, Message *msg) {
+FILE *openFileSelectionProcess(char *fileSelectionCommand, Message *msg) {
     errno = 0;
-    FILE *uploadPathsPipe = popen(uploadCommand, "r");
+    FILE *uploadPathsPipe = popen(fileSelectionCommand, "r");
     if (errno) {
         createMsg(msg, MSG_CANNOT_EXEC_UPLOAD_CMD, strerror(errno), MSG_TYPE_ERROR);
     }
@@ -322,3 +342,4 @@ void setUploadSuccessMsg(int nrOfFilesUploaded, Message *msg) {
     createMsg(msg, MSG_UPLOADED, nrOfFilesStr, MSG_TYPE_SUCCESS);
     free(nrOfFilesStr);
 }
+
