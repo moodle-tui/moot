@@ -31,6 +31,7 @@ typedef const char cchar;
 #define MSG_CANNOT_GET_ENV "Couldn't find required environment variables for your system"
 #define MSG_CANNOT_OPEN_CONFIG_FILE "Couldn't open config file: %s"
 #define MSG_NO_TOKEN "No token found in config file"
+#define MSG_NO_SITE "No site found in config file"
 #define MSG_CANNOT_ALLOCATE "Cannot allocate memory"
 #define MSG_CANNOT_OPEN_DOWNLOAD_FILE "Cannot open file for download: %s"
 #define MSG_CANNOT_EXEC_UPLOAD_CMD "Couldn't execute upload command: %s"

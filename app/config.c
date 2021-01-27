@@ -40,6 +40,8 @@ void initConfigValues(ConfigValues *configValues, Message *msg) {
     configValues->uploadCommand = xcalloc(LINE_LIMIT, sizeof(char), msg);
     if (msg->type != MSG_TYPE_ERROR)
         configValues->token = xcalloc(LINE_LIMIT, sizeof(char), msg);
+    if (msg->type != MSG_TYPE_ERROR)
+        configValues->site = xcalloc(LINE_LIMIT, sizeof(char), msg);
 }
 
 char *getConfigPath(Message *msg) {
@@ -107,9 +109,14 @@ void skipSeperator(int *readPos) {
 
 void sreadValue(ConfigValues *configValues, Property property, char *line, int *readPos, Message *msg) {
     switch (property) {
+        case PROPERTY_SITE:
+            configValues->site = sreadUntil(line, '\n', LINE_LIMIT, readPos, 1);
+            if (!configValues->site[0])
+                createMsg(msg, MSG_NO_SITE, NULL, MSG_TYPE_ERROR);
+            break;
         case PROPERTY_TOKEN:
             configValues->token = sreadUntil(line, '\n', LINE_LIMIT, readPos, 1);
-            if (!configValues->token)
+            if (!configValues->token[0])
                 createMsg(msg, MSG_NO_TOKEN, NULL, MSG_TYPE_ERROR);
             break;
         case PROPERTY_UPLOAD_COMMAND:

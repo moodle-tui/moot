@@ -28,12 +28,14 @@
 #define LINE_LIMIT 4096
 
 static cchar * const properties[] = {
+    "site",
     "token",
     "upload_command",
 };
 
 typedef enum Property {
     PROPERTY_INVALID = -1,
+    PROPERTY_SITE,
     PROPERTY_TOKEN,
     PROPERTY_UPLOAD_COMMAND,
     NR_OF_PROPERTIES,

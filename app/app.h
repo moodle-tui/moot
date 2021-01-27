@@ -193,6 +193,7 @@ void setHtmlRender(MDRichText *description, Message *msg);
 // config.c
 
 typedef struct ConfigValues {
+    char *site;
     char *token;
     char *uploadCommand;
 } ConfigValues;

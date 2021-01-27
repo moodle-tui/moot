@@ -51,7 +51,7 @@ int main() {
 void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, Message *msg) {
     MDError mdError = MD_ERR_NONE;
     md_init();
-    *client = md_client_new(configValues->token, "emokymai.vu.lt", &mdError);
+    *client = md_client_new(configValues->token, configValues->site, &mdError);
     if (!mdError)
         md_client_init(*client, &mdError);
     if (!mdError)
