@@ -54,7 +54,7 @@ These are commands, that moot interface currently supports.
 - To quit, press `q`.
 - To download a file, hover it and press `s`.
 - To upload files, hover desired module and press `u`. (Only assignments currently supported)
-- To dismiss the message (int bottom left), press `escape`
+- To dismiss the message (in bottom left), press `escape`
 
 ### Configuration
 App can be configured through config file, that should be located at `$XDG_CONFIG_HOME/moot/config` on unix systems and `%LOCALAPPDATA%\moot\config` on windows systems.

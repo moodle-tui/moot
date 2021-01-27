@@ -12,7 +12,6 @@
 #include "wcwidth.h"
 #include "app.h"
 #include "config.h"
-#include "internal.h"
 
 int main() {
     ConfigValues configValues;
