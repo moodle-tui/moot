@@ -11,16 +11,19 @@
 #if defined(_WIN32)
 #define PLATFORM_WIN
 #define PATH_SEPERATOR '\\'
-#define CONFIG_HOME_ENV "LOCALAPPDATA"
+#define ENV_CONFIG_HOME "LOCALAPPDATA"
 #else
 #define PLATFORM_UNIX
 #define PATH_SEPERATOR '/'
-#define CONFIG_HOME_ENV "XDG_CONFIG_HOME"
+#define ENV_CONFIG_HOME "XDG_CONFIG_HOME"
+#define ENV_HOME "HOME"
+#define CONFIG_HOME_FOLDER ".config"
 #endif
 
 #define CONFIG_FOLDER "moot"
 #define CONFIG_FILE "config"
 #define CFG_SEPERATOR '='
+#define MAX_CONFIG_PATH_LENGTH 4096
 
 #define LINE_LIMIT 4096
 
@@ -36,7 +39,7 @@ typedef enum Property {
     NR_OF_PROPERTIES,
 } Property;
 
-void initConfigValues(ConfigValues *configValues);
+void initConfigValues(ConfigValues *configValues, Message *msg);
 char *getConfigPath(Message *msg);
 FILE *openConfigFile(char *configPath, Message *msg);
 char *joinPaths(char *string1, char *string2);

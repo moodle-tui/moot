@@ -14,7 +14,9 @@
 #include "config.h"
 
 void readConfigFile(ConfigValues *configValues, Message *msg) {
-    initConfigValues(configValues);
+    initConfigValues(configValues, msg);
+    if (msg->type == MSG_TYPE_WARNING || msg->type == MSG_TYPE_ERROR)
+        return;
     char *configPath = getConfigPath(msg);
     if (msg->type == MSG_TYPE_WARNING || msg->type == MSG_TYPE_ERROR)
         return;
@@ -34,17 +36,31 @@ void readConfigFile(ConfigValues *configValues, Message *msg) {
     fclose(configFile);
 }
 
-void initConfigValues(ConfigValues *configValues) {
-    configValues->uploadCommand = calloc(LINE_LIMIT, sizeof(char));
+void initConfigValues(ConfigValues *configValues, Message *msg) {
+    configValues->uploadCommand = xcalloc(LINE_LIMIT, sizeof(char), msg);
+    if (msg->type != MSG_TYPE_ERROR)
+        configValues->token = xcalloc(LINE_LIMIT, sizeof(char), msg);
 }
 
 char *getConfigPath(Message *msg) {
-    char *sysConfigHome = getenv(CONFIG_HOME_ENV);
+    char *sysConfigHome = malloc(sizeof(char) * MAX_CONFIG_PATH_LENGTH);
+    sysConfigHome = getenv(ENV_CONFIG_HOME);
     if (!sysConfigHome) {
+#ifdef PLATFORM_UNIX
+        char *sysHome = getenv(ENV_HOME);
+        if (!sysHome) {
+            createMsg(msg, MSG_CANNOT_GET_ENV, NULL, MSG_TYPE_ERROR);
+            return NULL;
+        }
+        sysConfigHome = joinPaths(sysHome, CONFIG_HOME_FOLDER);
+#else
+        sysConfigHome = joinPaths(sysHome, CONFIG_HOME_FOLDER);
         createMsg(msg, MSG_CANNOT_GET_ENV, NULL, MSG_TYPE_ERROR);
         return NULL;
+#endif
     }
     char *configFolderPath = joinPaths(sysConfigHome, CONFIG_FOLDER);
+    free(sysConfigHome);
     char *configPath = joinPaths(configFolderPath, CONFIG_FILE);
     return configPath;
 }

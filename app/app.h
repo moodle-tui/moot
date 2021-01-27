@@ -202,7 +202,7 @@ void readConfigFile(ConfigValues *configValues, Message *msg);
 // input.c
 
 char *getInput(char *inputMsg, Message *msg);
-char *readLine(char *line, Message *msg);
+void readLine(char *line, Message *msg);
 
 // main.c
 

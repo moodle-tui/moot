@@ -1,5 +1,5 @@
 /*
- * Ramojus Lapinskas
+ * Ramojus Lapinskas ramojus.lap@gmail.com
  * licensed as with https://github.com/moodle-tui/moot
  */
  
@@ -19,13 +19,13 @@ char *getInput(char *inputMsg, Message *msg) {
     return line;
 }
 
-char *readLine(char *line, Message *msg) {
+void readLine(char *line, Message *msg) {
     int lineLen = 1;
     errno = 0;
     for (int i = 0; scanf("%c", &line[i]); ++i) {
         if (errno) {
             createMsg(msg, strerror(errno), NULL, MSG_TYPE_ERROR);
-            return line;
+            break;
         }
         //if (line[i] == '\n') {
         //    line[i] = 0;
@@ -33,12 +33,10 @@ char *readLine(char *line, Message *msg) {
         //}
         //if (!line[i])
         //    break;
-
         ++lineLen;
         line = xrealloc(line, lineLen * sizeof(char), msg);
         if (msg->type == MSG_TYPE_ERROR)
-            return line;
+            break;
     }
-    return line;
 }
 
