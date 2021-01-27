@@ -43,7 +43,7 @@ void initConfigValues(ConfigValues *configValues, Message *msg) {
 }
 
 char *getConfigPath(Message *msg) {
-    char *sysConfigHome = malloc(sizeof(char) * MAX_CONFIG_PATH_LENGTH);
+    char *sysConfigHome;
     sysConfigHome = getenv(ENV_CONFIG_HOME);
     if (!sysConfigHome) {
 #ifdef PLATFORM_UNIX
@@ -60,7 +60,6 @@ char *getConfigPath(Message *msg) {
 #endif
     }
     char *configFolderPath = joinPaths(sysConfigHome, CONFIG_FOLDER);
-    free(sysConfigHome);
     char *configPath = joinPaths(configFolderPath, CONFIG_FILE);
     return configPath;
 }

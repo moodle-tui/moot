@@ -201,6 +201,8 @@ void readConfigFile(ConfigValues *configValues, Message *msg);
 
 // input.c
 
+#define INPUT_ENTER_TITLE "Enter title:"
+
 char *getInput(char *inputMsg, Message *msg);
 void readLine(char *line, Message *msg);
 

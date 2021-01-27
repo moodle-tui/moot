@@ -12,6 +12,7 @@
 #include "wcwidth.h"
 #include "app.h"
 #include "config.h"
+#include "internal.h"
 
 int main() {
     ConfigValues configValues;
@@ -50,9 +51,11 @@ int main() {
 void initialize(MDClient **client, MDArray *courses, ConfigValues *configValues, Message *msg) {
     MDError mdError = MD_ERR_NONE;
     md_init();
-    *client = md_client_new(configValues->token, "https://emokymai.vu.lt", &mdError);
+    *client = md_client_new(configValues->token, "emokymai.vu.lt", &mdError);
     if (!mdError)
         md_client_init(*client, &mdError);
+    if (!mdError)
+        md_cleanup_json(md_client_do_http_json_request(*client, &mdError, "core_user_agree_site_policy", ""));
     if (!mdError)
         *courses = md_client_fetch_courses(*client, 0, &mdError);
     if (mdError) {

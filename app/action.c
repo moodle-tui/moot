@@ -242,7 +242,7 @@ void uploadFiles(MDClient *client, int depth, MDArray modules, int *highlightedO
     startUpload(client, module, fileNames, msg);
     if (checkIfAbort(*msg))
         return;
-    setUploadSuccessMsg(fileNames.len, msg);
+    //setUploadSuccessMsg(fileNames.len, msg);
     md_array_free(&fileNames);
 }
 
@@ -307,8 +307,11 @@ void startUpload(MDClient *client, MDModule module, MDArray fileNames, Message *
         md_client_mod_assign_submit(client, &module, &fileNames, NULL, &mdError);
     }
     else if (module.type == MD_MOD_WORKSHOP) {
-        createMsg(msg, "Workshop upload is not supported yet", NULL, MSG_TYPE_INFO);
-        //md_client_mod_workshop_submit(client, &module, &MD_MAKE_ARR(cchar *, filePath), NULL, "hmmm", &error);
+        char *title = getInput(INPUT_ENTER_TITLE, msg);
+        if (!checkIfAbort(*msg)) {
+            createMsg(msg, title, NULL, MSG_TYPE_INFO);
+        }
+        md_client_mod_workshop_submit(client, &module, &fileNames, NULL, title, &mdError);
     }
     if (mdError)
         createMsg(msg, md_error_get_message(mdError), NULL, MSG_TYPE_ERROR);

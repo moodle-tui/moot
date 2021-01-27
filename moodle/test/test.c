@@ -108,8 +108,7 @@ int main() {
         goto end;
  
     printf("Creating client\n");
-    // MDClient *client = md_client_new(token, DEMO_SITE, &error);
-    MDClient *client = md_client_new("926ca0fae3f4d80dfba00f7be9124e04", "emokymai.vu.lt", &error);
+    MDClient *client = md_client_new(token, DEMO_SITE, &error);
     cleanClient = true;
     if (error)
         goto end;
